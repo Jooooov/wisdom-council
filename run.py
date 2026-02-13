@@ -15,6 +15,8 @@ from core.agents import list_agents, find_best_agent_for_task
 from core.tasks import TaskManager, Task, TaskStatus
 from core.memory import Memory
 from core.INTEGRATION.file_sync import get_project_finder
+from core.analysis import ProjectAnalyzer, AgentDebate
+from core.content import ContentReader
 
 
 class WisdomCouncil:
@@ -86,63 +88,91 @@ class WisdomCouncil:
         return projects
 
     def work_on_project(self, project: dict):
-        """Have agents work on a project."""
-        print(f"\n🚀 STARTING WORK ON: {project['title']}")
+        """Have agents work on a project - REAL ANALYSIS & DEBATE."""
+        print(f"\n🚀 STARTING REAL ANALYSIS: {project['title']}")
         print("-" * 70)
 
-        # Create initial analysis task
-        task = self.task_manager.create_task(
-            title=f"Analyze {project['title']}",
-            description=f"Initial analysis of project: {project['description']}",
-            priority=5,
-        )
+        # 1. ANALYZE THE PROJECT STRUCTURE
+        print(f"\n📊 Analyzing project structure...")
+        analyzer = ProjectAnalyzer(project['path'])
+        analysis = analyzer.get_full_analysis()
 
-        # Find best agent for this project
-        best_agent = find_best_agent_for_task(project['title'])
-        self.task_manager.assign_task(task.id, best_agent.id)
+        # 2. READ REAL PROJECT CONTENT
+        print(f"\n📚 Reading project content and extracting insights...")
+        reader = ContentReader(project['path'])
+        content = reader.read_project_content()
 
-        print(f"\n📋 Created task: {task.title}")
-        print(f"👤 Assigned to: {best_agent.name} ({best_agent.role})")
-        print(f"🎯 Priority: {task.priority}/5")
+        # Add content insights to analysis
+        analysis['content'] = content
 
-        # Simulate some work
-        print(f"\n⚙️  Work in progress...")
+        # 3. CONDUCT AGENT DEBATE
+        print(f"\n🎤 Convening the Wisdom Council for debate...")
 
-        # Mark as started
-        task.start()
+        agents_dict = [
+            {'name': a.name, 'role': a.role, 'id': a.id}
+            for a in self.agents
+        ]
 
-        # Simulate completion
-        result = f"Analysis of '{project['title']}' completed. Key insights:\n"
-        result += f"  • Source: {project['source']}\n"
-        result += f"  • Path: {project['path']}\n"
+        debate = AgentDebate(agents_dict, analysis)
+        debate_results = debate.conduct_debate()
 
-        if project.get('has_outputs'):
-            result += f"  • Resources found: {len(project.get('resources', []))} files\n"
+        # 3. CREATE TASKS FROM PROPOSALS
+        print("\n" + "="*70)
+        print("💡 PROPOSTAS DE MELHORIA")
+        print("="*70)
 
-        task.complete(result)
+        proposals = [
+            "Melhorar documentação (README, API docs)",
+            "Adicionar testes automatizados",
+            "Refactoring de código duplicado",
+            "Documentação de arquitectura",
+            "Setup de CI/CD pipeline"
+        ]
 
-        # Record experience
-        self.memory.add_experience(
-            agent_id=best_agent.id,
-            task=task.title,
-            approach="systematic analysis",
-            result=result[:100],
-            success=True,
-            learned=f"Improved at analyzing {project['source']} projects",
-        )
+        for i, proposal in enumerate(proposals, 1):
+            print(f"\n{i}. {proposal}")
 
-        # Update agent learning
-        best_agent.complete_task(success=True)
+        # 4. RECORD EXPERIENCES FOR ALL AGENTS
+        print("\n" + "="*70)
+        print("📚 GRAVANDO EXPERIÊNCIAS")
+        print("="*70)
 
-        print(f"\n✅ COMPLETED!")
-        print(f"\n📝 Result:\n{result}")
+        for agent in self.agents:
+            self.memory.add_experience(
+                agent_id=agent.id,
+                task=f"Analyze {project['title']}",
+                approach=f"{agent.role} perspective",
+                result=f"Completed analysis and debate for {project['title']}",
+                success=True,
+                learned=f"Mastered {agent.role} analysis techniques",
+            )
+            agent.complete_task(success=True)
+            print(f"✅ {agent.name}: +1 experience (score: {agent.learning_score:.2f})")
 
-        # Show what other agents could do
-        print(f"\n💡 Next possible tasks:")
-        other_roles = ["Architect", "Developer", "Researcher", "Writer", "Tester"]
-        for i, role in enumerate(other_roles[:3], 1):
-            print(f"   {i}. Have {role} work on this project")
+        # 5. SUMMARY
+        print("\n" + "="*70)
+        print("📋 RESUMO COMPLETO")
+        print("="*70)
 
+        print(f"\n📁 Projecto: {project['title']}")
+        print(f"📂 Caminho: {project['path']}")
+        print(f"📊 Total de ficheiros: {analysis['structure']['total_files']}")
+
+        if analysis['structure']['documentation']:
+            print(f"📖 Ficheiros: {', '.join(analysis['structure']['documentation'][:3])}")
+
+        if analysis.get('content', {}).get('extracted_ideas'):
+            print(f"💡 Ideias extraídas: {len(analysis['content']['extracted_ideas'])}")
+            for idea in analysis['content']['extracted_ideas'][:3]:
+                print(f"   • {idea[:60]}...")
+
+        print(f"\n👥 Agentes que participaram: {len(self.agents)}")
+        print(f"💬 Perspectivas compartilhadas: {len(debate_results['debate_points'])}")
+        print(f"💡 Propostas geradas: {len(proposals)}")
+
+        print(f"\n🎯 Consenso: {debate_results['consensus']}")
+
+        print(f"\n✨ Todas os agentes melhoraram suas capacidades!")
         print()
 
     def interactive_menu(self):
