@@ -111,7 +111,12 @@ class ContextAnalyzer:
         # Count file types
         py_files = list(self.project_path.glob("**/*.py"))
         js_files = list(self.project_path.glob("**/*.js"))
-        config_files = list(self.project_path.glob("**/*.{yaml,yml,json,toml,ini}", recursive=True))
+
+        # Config files (multiple extensions)
+        config_files = []
+        for ext in ['yaml', 'yml', 'json', 'toml', 'ini']:
+            config_files.extend(self.project_path.glob(f"**/*.{ext}"))
+
         doc_files = list(self.project_path.glob("**/*.md"))
         test_files = [f for f in py_files if 'test' in f.name]
 

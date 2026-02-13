@@ -23,7 +23,6 @@ class MarketResearcher:
         self.project_type = project_type
         self.objectives = objectives
         self.perplexity_available = False
-        self._check_perplexity()
 
     async def _check_perplexity(self):
         """Check if Perplexity MCP is available."""
@@ -45,6 +44,9 @@ class MarketResearcher:
             "gaps": [],
             "opportunities": []
         }
+
+        # Check Perplexity availability
+        await self._check_perplexity()
 
         if not self.perplexity_available:
             logger.warning("Cannot perform market research without Perplexity MCP")
