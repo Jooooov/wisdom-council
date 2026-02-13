@@ -1,5 +1,6 @@
 """
-Simple Agent System - 7 core agents for the Wisdom Council
+The Wisdom Council - 7 Agents from His Dark Materials
+Each with unique daemon and specialized skills
 """
 
 from dataclasses import dataclass, field
@@ -10,12 +11,18 @@ import uuid
 
 @dataclass
 class Agent:
-    """A simple agent with clear role and capabilities."""
+    """
+    An agent based on His Dark Materials characters.
+    Each has a daemon (external manifestation of soul).
+    """
     id: str
-    name: str
-    role: str  # e.g., "Analyst", "Developer", "Researcher"
+    name: str                    # Character name from His Dark Materials
+    character: str               # Full character description
+    role: str                    # Professional role
+    daemon: str                  # Their daemon (external soul/animal)
     description: str
     skills: List[str] = field(default_factory=list)
+    personality_traits: List[str] = field(default_factory=list)
     is_active: bool = True
     current_task: str = ""
     completed_tasks: int = 0
@@ -43,9 +50,12 @@ class Agent:
         return {
             'id': self.id,
             'name': self.name,
+            'character': self.character,
             'role': self.role,
+            'daemon': self.daemon,
             'description': self.description,
             'skills': self.skills,
+            'personality_traits': self.personality_traits,
             'is_active': self.is_active,
             'current_task': self.current_task,
             'completed_tasks': self.completed_tasks,
@@ -53,56 +63,77 @@ class Agent:
         }
 
 
-# Define the 7 Core Agents
+# The 7 Core Agents - Characters from His Dark Materials
 CORE_AGENTS = [
     Agent(
         id="analyst",
         name="Lyra",
+        character="Lyra Belacqua - Curious, brave, truth-seeker",
         role="Analyst",
-        description="Analyzes projects, identifies patterns, extracts insights",
-        skills=["analysis", "research", "data-extraction", "pattern-recognition"],
+        daemon="Pantalaimon (marten, proteus daemon - can change shape)",
+        description="Analyzes deeply, seeks patterns, questions assumptions",
+        skills=["analysis", "research", "truth-seeking", "pattern-recognition", "curiosity"],
+        personality_traits=["curious", "brave", "honest", "protective"],
     ),
     Agent(
         id="architect",
         name="Iorek",
+        character="Iorek Byrnison - Armored bear warrior",
         role="Architect",
-        description="Designs system architecture, proposes solutions, structures complexity",
-        skills=["design", "architecture", "planning", "problem-solving"],
+        daemon="None (sentient bear, no human daemon)",
+        description="Designs robust structures, provides strength and protection, resolves conflicts",
+        skills=["design", "architecture", "structure", "strength", "protection"],
+        personality_traits=["strong", "honorable", "protective", "strategic"],
     ),
     Agent(
         id="developer",
         name="Marisa",
+        character="Marisa Coulter - Ambitious, charismatic, decisive",
         role="Developer",
-        description="Writes and implements code, creates features, maintains quality",
-        skills=["coding", "implementation", "debugging", "optimization"],
+        daemon="Golden Monkey (intelligent, precise, commanding)",
+        description="Executes with ambition, drives projects forward, makes decisive actions",
+        skills=["execution", "implementation", "ambition", "decisiveness", "action"],
+        personality_traits=["ambitious", "charismatic", "decisive", "driven"],
     ),
     Agent(
         id="researcher",
         name="Serafina",
+        character="Serafina Pekkala - Queen of the witches",
         role="Researcher",
-        description="Conducts research, gathers information, explores solutions",
-        skills=["research", "investigation", "exploration", "knowledge-gathering"],
+        daemon="Witch-nature (aerial perspective, ancient wisdom)",
+        description="Conducts deep research, sees big picture, gathers ancient knowledge",
+        skills=["research", "investigation", "wisdom", "big-picture-thinking", "knowledge"],
+        personality_traits=["wise", "strategic", "far-seeing", "knowledgeable"],
     ),
     Agent(
         id="writer",
         name="Lee",
+        character="Lee Scoresby - Aeronaut storyteller",
         role="Writer",
-        description="Creates documentation, writes content, communicates ideas",
-        skills=["writing", "documentation", "communication", "content-creation"],
+        daemon="Hester (hare - fast, aware, communicative)",
+        description="Creates clear communication, tells stories, documents discoveries",
+        skills=["writing", "documentation", "storytelling", "communication", "clarity"],
+        personality_traits=["loyal", "brave", "communicative", "observant"],
     ),
     Agent(
-        id="tester",
-        name="Pantalaimon",
-        role="Tester",
-        description="Tests functionality, validates quality, finds issues",
-        skills=["testing", "quality-assurance", "validation", "bug-detection"],
+        id="validator",
+        name="Coram",
+        character="Farder Coram - Experienced gyptian",
+        role="Validator",
+        daemon="Sophonax (water bird/lavender - careful, experienced)",
+        description="Validates thoroughly, tests carefully, brings experience, identifies risks",
+        skills=["validation", "testing", "risk-assessment", "experience", "caution"],
+        personality_traits=["experienced", "careful", "wise", "protective"],
     ),
     Agent(
         id="coordinator",
-        name="Philip",
+        name="Asriel",
+        character="Lord Asriel - Strategic leader, ambitious visionary",
         role="Coordinator",
-        description="Coordinates between agents, manages tasks, ensures progress",
-        skills=["coordination", "management", "communication", "decision-making"],
+        daemon="Stelmaria (snow leopard - powerful, protective, regal)",
+        description="Coordinates grand strategy, commands loyalty, drives ambitious vision forward",
+        skills=["coordination", "leadership", "strategy", "vision", "command"],
+        personality_traits=["ambitious", "strategic", "powerful", "charismatic"],
     ),
 ]
 
