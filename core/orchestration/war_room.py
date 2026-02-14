@@ -38,10 +38,12 @@ class WarRoom:
         print("🧠 INICIALIZAÇÃO DA SALA DE GUERRA")
         print("=" * 70)
 
-        # Read project context and enrich with file analysis
+        # Read project context and enrich with file analysis + Perplexity research
         if self.project_path:
             print("\n📂 Lendo contexto do projeto...")
             try:
+                import os
+
                 # Extract additional paths from business case if it's a merged project
                 additional_paths = []
                 if isinstance(self.business_case, dict) and self.business_case.get('paths'):
@@ -54,13 +56,23 @@ class WarRoom:
                 if self.manual_inputs_context:
                     print("   ✅ Contexto do projeto carregado")
 
-                # Enrich with file analysis
-                print("\n📊 Enriquecendo contexto com análise de ficheiros...")
+                # Enrich with file analysis and Perplexity research
+                print("\n📊 Enriquecendo contexto com análise de ficheiros + Perplexity...")
                 enricher = ContextEnricher(self.project_path)
                 enricher.analyze_project_files()
+
+                # Add Perplexity research (async call in async context)
+                api_key = os.getenv('PERPLEXITY_API_KEY')
+                if api_key:
+                    try:
+                        query = enricher._generate_research_query()
+                        await enricher.enrich_with_web_research(query, api_key)
+                    except Exception as e:
+                        print(f"   ⚠️  Erro ao pesquisar Perplexity: {e}")
+
                 enriched = enricher.get_enriched_context()
                 self.manual_inputs_context += "\n\n" + enriched
-                print("   ✅ Contexto enriquecido com ficheiros do projeto")
+                print("   ✅ Contexto enriquecido com ficheiros e pesquisa")
 
             except Exception as e:
                 print(f"   ⚠️  Erro ao processar contexto: {e}")
