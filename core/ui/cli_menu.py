@@ -76,13 +76,74 @@ class CLIMenu:
 
         options = []
         for i, project in enumerate(projects, 1):
-            display_name = f"{i}. {project['title'][:50]}"
-            options.append((display_name, lambda p=project: self._analyze_project(p)))
+            display_name = f"{i}. {project['title'][:40]}"
+            options.append((display_name, lambda p=project: self._show_project_actions(p)))
 
         options.append(("↩️  Back to main menu", lambda: None))
 
         self._print_options(options)
         self._handle_menu_choice(options)
+
+    def _show_project_actions(self, project: Dict[str, Any]):
+        """Show actions for a specific project."""
+        print("\n" + "-" * 80)
+        print(f"PROJECT: {project['title']}".center(80))
+        print("-" * 80)
+
+        options = [
+            ("📊 Enriquecer Contexto (Ficheiros + Perplexity)", lambda: self._enrich_project_context(project)),
+            ("⚔️  Analisar Projeto (War Room)", lambda: self._analyze_project(project)),
+            ("↩️  Back to projects", lambda: None)
+        ]
+
+        self._print_options(options)
+        self._handle_menu_choice(options)
+
+    def _enrich_project_context(self, project: Dict[str, Any]):
+        """Enrich project context with file analysis and Perplexity."""
+        print("\n" + "-" * 80)
+        print(f"📚 Enriquecendo Contexto: {project['title']}")
+        print("-" * 80)
+
+        try:
+            import asyncio
+            import os
+            from core.research.context_enricher import ContextEnricher
+
+            # Analyze files
+            print("\n📁 Analisando ficheiros do projeto...")
+            enricher = ContextEnricher(project['path'])
+            enricher.analyze_project_files()
+
+            # Enrich with Perplexity
+            print("\n🌐 Pesquisando no Perplexity...")
+            api_key = os.getenv('PERPLEXITY_API_KEY')
+            query = enricher._generate_research_query()
+            print(f"   Query gerada: {query}")
+
+            asyncio.run(enricher.enrich_with_web_research(query, api_key))
+
+            # Display enriched context
+            enriched = enricher.get_enriched_context()
+            print("\n" + "=" * 80)
+            print("📚 CONTEXTO ENRIQUECIDO")
+            print("=" * 80)
+            print(enriched)
+
+            # Offer to save
+            response = input("\n💾 Guardar contexto enriquecido? (s/n): ").strip().lower()
+            if response == 's':
+                # Save to project
+                context_file = Path(project['path']) / "contexto_enriquecido.md"
+                with open(context_file, 'w', encoding='utf-8') as f:
+                    f.write(enriched)
+                print(f"✅ Contexto guardado em {context_file}")
+
+            input("\nPress ENTER to continue...")
+
+        except Exception as e:
+            print(f"\n❌ Erro ao enriquecer: {e}")
+            input("\nPress ENTER to continue...")
 
     def _show_war_room_menu(self):
         """Show War Room menu."""
