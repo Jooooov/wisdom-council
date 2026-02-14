@@ -3,6 +3,7 @@
 The Wisdom Council v2 - Simplified, Practical, Powerful
 
 A leaner multi-agent system that works on REAL projects.
+With DeepSeek-R1-Distill-Qwen-14B and RAM guardrails.
 """
 
 import sys
@@ -10,6 +11,42 @@ from pathlib import Path
 
 # Add core to path
 sys.path.insert(0, str(Path(__file__).parent))
+
+# CRITICAL: Check RAM before anything else
+def check_ram_before_startup():
+    """Verify RAM is sufficient before starting."""
+    try:
+        from core.llm import create_ram_manager, create_mlx_loader
+
+        ram = create_ram_manager()
+        loader = create_mlx_loader(ram)
+
+        can_load, message = loader.check_ram_availability()
+
+        print("\n" + "="*70)
+        print("🛡️  RAM GUARDIAN - Pre-Startup Check")
+        print("="*70)
+        print(message)
+
+        if not can_load:
+            print("\n" + "!"*70)
+            print("❌ CANNOT START - INSUFFICIENT RAM")
+            print("!"*70)
+            print("\nPlease:")
+            print("  1. Close ALL browser tabs")
+            print("  2. Close Slack, Discord, email clients")
+            print("  3. Close IDEs and editors")
+            print("  4. Restart your MacBook")
+            print("  5. Try again")
+            sys.exit(1)
+        else:
+            print("\n✅ RAM check passed - safe to proceed\n")
+            return True
+    except Exception as e:
+        print(f"\n⚠️  Could not verify RAM: {e}")
+        print("Attempting to continue anyway...")
+        return False
+
 
 from core.agents import list_agents, find_best_agent_for_task
 from core.tasks import TaskManager, Task, TaskStatus
@@ -29,11 +66,13 @@ class WisdomCouncil:
         self.agents = list_agents()
         self.project_finder = get_project_finder()
         self.current_project = None
+        self.llm_loaded = False
 
     def print_header(self):
         """Print welcome header."""
         print("\n" + "="*70)
         print("  🧙‍♂️  THE WISDOM COUNCIL v2")
+        print("  DeepSeek-R1-Distill-Qwen-14B with RAM Protection")
         print("  Simplified. Practical. Powerful.")
         print("="*70 + "\n")
 
@@ -283,6 +322,10 @@ class WisdomCouncil:
 
 
 if __name__ == "__main__":
+    # CRITICAL: Check RAM before starting
+    if not check_ram_before_startup():
+        print("⚠️  Proceeding with caution (RAM check failed)")
+
     try:
         council = WisdomCouncil()
         council.run()

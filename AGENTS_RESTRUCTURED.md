@@ -282,28 +282,213 @@ Their daemons influence:
 
 ---
 
+## 🧠 The Intelligence Engine - DeepSeek-R1-Distill-Qwen-8B
+
+### The LLM Powering the Council
+```
+Model:           DeepSeek-R1-Distill-Qwen-8B
+Framework:       MLX (Apple Silicon optimized)
+Capabilities:    ✅ Reasoning + Chain-of-thought
+Language:        ✅ Portuguese + English (native support)
+Location:        ~/mlx-models/DeepSeek-R1-Distill-Qwen-8B-MLX/
+RAM Required:    8GB minimum, 10GB ideal
+```
+
+### What Changed
+- ❌ **OLD:** Qwen3 8B (had issues responding only in Chinese)
+- ✅ **NEW:** DeepSeek-R1-Distill-Qwen-8B (reasoning + Portuguese)
+
+### Why This Model
+
+| Need | Qwen3 8B | DeepSeek-R1 14B |
+|------|----------|---|
+| Reasoning | ❌ Limited | ✅ Professional |
+| Portuguese | ⚠️ Buggy | ✅ Native |
+| 16GB Compatibility | ✅ Safe | ✅ Perfect |
+| Consulting Level | ❌ Generic | ✅ Deep |
+
+### What Each Agent Gets
+The LLM enhances each agent with **reasoning capability**:
+- **Lyra**: Semantic analysis + chain-of-thought reasoning
+- **Iorek**: Architectural reasoning with step-by-step logic
+- **Marisa**: Technical feasibility with explained decisions
+- **Serafina**: Market research with reasoned insights
+- **Lee**: Content with explained reasoning for clarity
+- **Coram**: Risk analysis with mitigation strategies explained
+- **Asriel**: Strategic decisions with transparent reasoning
+
+---
+
+## 🛡️ RAM Guardrails - Critical Safety System
+
+### IMPORTANT: Check RAM Before Every Session
+
+**Run this command FIRST:**
+```bash
+python check_ram_before_use.py
+```
+
+This verifies:
+- ✅ Model files are downloaded
+- ✅ You have 13GB+ RAM (minimum)
+- ✅ You have 16GB+ RAM (ideal)
+- ✅ System is ready to use
+
+### The 6-Level Protection System
+
+#### GUARDRAIL 1: Hard Minimum Threshold
+```
+If RAM < 13GB:
+  ❌ CANNOT LOAD MODEL
+  Solutions: Close apps, restart MacBook
+```
+
+#### GUARDRAIL 2: Ideal RAM Warning
+```
+If RAM < 16GB (but > 13GB):
+  ⚠️  CAN LOAD but may be SLOWER
+  Solution: Close other applications
+```
+
+#### GUARDRAIL 3: Pre-Load Verification
+```
+Before loading:
+  ✓ Refresh RAM status
+  ✓ Verify minimum requirement met
+  ✓ Warn if below ideal
+```
+
+#### GUARDRAIL 4: Load-Time Check
+```
+During loading:
+  ✓ Final RAM check
+  ✓ Catch out-of-memory errors
+  ✓ Provide specific solutions
+```
+
+#### GUARDRAIL 5: Post-Load Verification
+```
+After successful load:
+  ✓ Check remaining RAM
+  ✓ Warn if < 3GB left
+  ✓ Advise closing additional apps
+```
+
+#### GUARDRAIL 6: Generation-Time Check
+```
+Before each analysis:
+  ✓ Verify 3GB+ free for generation
+  ✓ Warn if < 5GB
+  ✓ Raise error if insufficient
+  ✓ Suggest: restart or reduce max_tokens
+```
+
+### Clear Error Messages
+
+If analysis fails, errors tell you **exactly** what to do:
+
+```
+❌ CRITICAL: Insufficient RAM!
+   Available: 8.5GB
+   Required: 13GB minimum
+   Deficit: 4.5GB short!
+
+SOLUTIONS:
+  1. Close all browser tabs
+  2. Close Slack, Discord, email clients
+  3. Close IDEs and text editors
+  4. Restart your MacBook
+  5. Try again
+```
+
+### RAM Monitoring Commands
+
+```bash
+# Check status before starting
+python check_ram_before_use.py
+
+# Full system status
+python -c "from core.llm import create_ram_manager; create_ram_manager().print_status()"
+
+# Watch in real-time during analysis
+watch -n 1 'top -l 1 | grep Memory'
+```
+
+### Your Setup is Tight!
+```
+Total RAM:       16GB
+Model minimum:   13GB
+Model loaded:    ~13GB used
+Remaining:       ~3GB for OS + other apps
+
+⚠️  Close other apps before analysis!
+⚠️  Monitor RAM during long operations!
+⚠️  Don't open heavy apps while analyzing!
+```
+
+---
+
 ## Next Steps
 
+### Before Using the Council
+1. **Check RAM:** `python check_ram_before_use.py`
+2. **Verify Setup:** `python verify_setup.py`
+3. **Test LLM:** `python test_deepseek_portuguese.py`
+4. **Confirm Ready:** All tests pass ✅
+
 ### Implementation
-1. ✅ Agents restructured with correct characters
+1. ✅ Agents restructured with His Dark Materials characters
 2. ✅ Daemons assigned and documented
-3. ⏳ Update agent behavior to reflect daemon nature
-4. ⏳ Implement agent personalities in conversations
-5. ⏳ Add daemon-based decision making
+3. ✅ LLM integrated: DeepSeek-R1-Distill-Qwen-8B
+4. ✅ RAM guardrails implemented (6 levels)
+5. ⏳ Test each agent with new LLM capability
+6. ⏳ Verify Portuguese + reasoning quality
+7. ⏳ Run full Wisdom Council analysis
 
 ### In Orchestration
 The Orchestrator now:
 - Assigns tasks based on daemon strengths
 - Coordinates complementary daemons
-- Leverages daemon nature for better decisions
-- Records learning with character context
+- Leverages LLM reasoning capability
+- **PROTECTS against RAM exhaustion** (critical!)
+- Provides transparent chain-of-thought reasoning
+- Records decisions with full justification
 
 ---
 
 ## The Wisdom Council is Complete! 🧙‍♂️
 
-Seven characters from His Dark Materials, each with unique daemon,
+**Seven characters** from His Dark Materials, each with unique daemon,
+**Powered by DeepSeek-R1** with professional reasoning capability,
+**Protected by guardrails** against system failures,
 working together to analyze, design, execute, research, communicate,
-validate, and coordinate your projects with wisdom and power.
+validate, and coordinate your projects with wisdom, power, and transparency.
+
+### Starting Your First Session
+```bash
+# ALWAYS start with this!
+python check_ram_before_use.py
+
+# Wait for ✅ ALL CHECKS PASSED
+
+# THEN you're safe to use the Wisdom Council
+```
 
 **The Council is ready for work!** ✨
+
+---
+
+## ⚠️ THE MOST IMPORTANT RULE
+
+### DO NOT SKIP RAM CHECK!
+```bash
+python check_ram_before_use.py
+```
+
+Running analysis without this check can cause:
+- System crashes
+- Loss of work
+- Data corruption
+- Hours of recovery time
+
+**Takes 10 seconds. Saves hours of pain.** 🛡️
