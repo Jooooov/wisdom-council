@@ -92,11 +92,11 @@ class WisdomCouncil:
         print()
 
     def list_projects(self):
-        """List available projects."""
+        """List available projects - merged and enriched."""
         print("\n📁 AVAILABLE PROJECTS")
         print("-" * 70)
 
-        projects = self.project_finder.find_all_projects()
+        projects = self.project_finder.find_all_projects(merge_duplicates=True)
 
         if not projects:
             print("❌ No real projects found")
@@ -108,21 +108,39 @@ class WisdomCouncil:
 
         print(f"\nFound {len(projects)} real projects:\n")
 
+        merged = [p for p in projects if p['source'] == 'MERGED']
         obsidian = [p for p in projects if p['source'] == 'Obsidian']
         apps = [p for p in projects if p['source'] == 'Apps']
 
-        if obsidian:
-            print("🧠 OBSIDIAN PROJECTS:")
-            for i, p in enumerate(obsidian, 1):
-                print(f"   {i}. {p['title']}")
-                print(f"      {p['description'][:60]}")
+        counter = 1
 
-        if apps:
-            print("\n💻 APP PROJECTS:")
-            for i, p in enumerate(apps, len(obsidian) + 1):
+        # Mostrar projectos merged primeiro (enriquecidos)
+        if merged:
+            print("🎯 MERGED PROJECTS (Obsidian + App Code - Enriched):")
+            for p in merged:
                 has_outputs = " [📊 has outputs]" if p.get('has_outputs') else ""
-                print(f"   {i}. {p['title']}{has_outputs}")
+                print(f"   {counter}. {p['title']}{has_outputs}")
+                print(f"      📚 {p['obsidian_project']['description'][:45]}")
+                print(f"      💻 {p['apps_project']['description'][:45]}")
+                print(f"      ✨ ENRICHED - Contexto Obsidian + Código Apps")
+                counter += 1
+
+        # Mostrar projectos só de Obsidian
+        if obsidian:
+            print("\n📖 OBSIDIAN PROJECTS (Context Only):")
+            for p in obsidian:
+                print(f"   {counter}. {p['title']}")
                 print(f"      {p['description'][:60]}")
+                counter += 1
+
+        # Mostrar projectos só de Apps
+        if apps:
+            print("\n💻 APP PROJECTS (Code Only):")
+            for p in apps:
+                has_outputs = " [📊 has outputs]" if p.get('has_outputs') else ""
+                print(f"   {counter}. {p['title']}{has_outputs}")
+                print(f"      {p['description'][:60]}")
+                counter += 1
 
         print()
         return projects

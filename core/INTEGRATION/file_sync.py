@@ -4,12 +4,15 @@ File Sync - Integração com Obsidian e projectos locais.
 APENAS PROJECTOS REAIS:
 - Obsidian: Pastas em "1 - Projectos/"
 - Apps: Pastas com .git/ ou estrutura de código
+
+NOVO: Merge de projectos que existem em ambas as localizações
 """
 
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from difflib import SequenceMatcher
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,8 +28,8 @@ class ProjectFinder:
         self.apps_path = Path.home() / "Desktop" / "Apps"
         self.projects = []
 
-    def find_all_projects(self) -> List[Dict[str, Any]]:
-        """Encontra APENAS projectos reais."""
+    def find_all_projects(self, merge_duplicates: bool = True) -> List[Dict[str, Any]]:
+        """Encontra APENAS projectos reais e opcionalmente faz merge de duplicados."""
         self.projects = []
         seen_paths = set()  # Para evitar duplicados
 
@@ -36,7 +39,109 @@ class ProjectFinder:
         # Procura em Apps (apenas projectos com código/git)
         self._scan_apps_projects(seen_paths)
 
+        # Faz merge de projectos duplicados (mesmo projecto em Obsidian e Apps)
+        if merge_duplicates:
+            self.projects = self._merge_duplicate_projects(self.projects)
+
         return self.projects
+
+    def _merge_duplicate_projects(self, projects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Detecta projectos que existem em Obsidian e Apps e faz merge deles."""
+        obsidian_projects = [p for p in projects if p['source'] == 'Obsidian']
+        apps_projects = [p for p in projects if p['source'] == 'Apps']
+
+        merged_projects = []
+        used_obsidian = set()
+        used_apps = set()
+
+        # Para cada projecto Obsidian, procura um correspondente em Apps
+        for obs_project in obsidian_projects:
+            best_match = None
+            best_score = 0
+
+            for i, app_project in enumerate(apps_projects):
+                if i in used_apps:
+                    continue
+
+                # Calcula similaridade entre nomes
+                similarity = self._calculate_similarity(
+                    obs_project['title'].lower(),
+                    app_project['title'].lower()
+                )
+
+                if similarity > best_score:
+                    best_score = similarity
+                    best_match = i
+
+            # Se encontrou um match (>60% similarity), faz merge
+            if best_match is not None and best_score > 0.6:
+                merged = self._merge_two_projects(
+                    obsidian_projects[obsidian_projects.index(obs_project)],
+                    apps_projects[best_match]
+                )
+                merged_projects.append(merged)
+                used_obsidian.add(obsidian_projects.index(obs_project))
+                used_apps.add(best_match)
+            else:
+                # Sem match, adiciona o projecto Obsidian como está
+                merged_projects.append(obs_project)
+                used_obsidian.add(obsidian_projects.index(obs_project))
+
+        # Adiciona projectos de Apps que não têm correspondente em Obsidian
+        for i, app_project in enumerate(apps_projects):
+            if i not in used_apps:
+                merged_projects.append(app_project)
+
+        return merged_projects
+
+    def _calculate_similarity(self, str1: str, str2: str) -> float:
+        """Calcula similaridade entre duas strings (0-1)."""
+        return SequenceMatcher(None, str1, str2).ratio()
+
+    def _merge_two_projects(self, obsidian: Dict[str, Any], apps: Dict[str, Any]) -> Dict[str, Any]:
+        """Faz merge de um projecto Obsidian com um projecto Apps."""
+        # Use Obsidian title if more descriptive, else Apps title
+        title = obsidian['title'] if len(obsidian['title']) > len(apps['title']) else apps['title']
+
+        # Juntar descrições
+        description = f"📚 {obsidian['description']} | 💻 {apps['description']}"
+
+        # Juntar conteúdo de ambas as fontes
+        context_obsidian = obsidian.get('content_sample', '')
+        context_apps = apps.get('content_sample', '')
+        combined_context = f"**Obsidian Context:**\n{context_obsidian}\n\n**App Context:**\n{context_apps}"
+
+        merged = {
+            "title": title,
+            "description": description,
+            "source": "MERGED",  # Novo tipo: merged
+            "paths": {
+                "obsidian": obsidian['path'],
+                "apps": apps['path']
+            },
+            "obsidian_project": obsidian,
+            "apps_project": apps,
+            "type": "merged_project",
+            "content_sample": combined_context[:1000],  # Primeiros 1000 chars
+            "created": min(obsidian['created'], apps['created']),  # Data mais antiga
+            "modified": max(obsidian['modified'], apps['modified']),  # Data mais recente
+            "has_context": True,  # Indica que tem contexto de Obsidian
+            "has_code": True,  # Indica que tem código de Apps
+            "is_merged": True,
+            "metadata": {
+                "obsidian_subfolders": len([d for d in Path(obsidian['path']).iterdir() if d.is_dir()]),
+                "apps_files": len(list(Path(apps['path']).glob("**/*"))),
+                "enriched": True  # Indica que foi enriquecido
+            }
+        }
+
+        # Copiar recursos se existem em Apps
+        if apps.get('has_outputs'):
+            merged['outputs_path'] = apps['outputs_path']
+            merged['resources'] = apps['resources']
+            merged['has_outputs'] = True
+
+        return merged
 
     def _scan_obsidian_projects(self, seen_paths: set):
         """Procura projectos em Obsidian - APENAS pasta '1 - Projectos'."""
