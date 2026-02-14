@@ -148,10 +148,8 @@ class WarRoom:
                 "confidence": self._extract_confidence(reasoning)
             }
 
-            # Print perspective
-            print(f"   ✅ Análise completa")
-            if perspective['recommendation']:
-                print(f"      Recomendação: {perspective['recommendation']}")
+            # Print detailed agent thinking
+            self._display_agent_thinking(agent, perspective)
 
             self.discussion_log.append({
                 "speaker": agent.name,
@@ -436,6 +434,45 @@ Forneça raciocínio claro para sua recomendação. Responda em português."""
         # Simple heuristic: longer, more detailed reasoning = higher confidence
         confidence = min(9, max(4, len(text.split()) // 30))
         return confidence
+
+    def _display_agent_thinking(self, agent, perspective: Dict[str, Any]):
+        """Display agent's thinking process in a visual format."""
+        daemon = perspective.get('daemon', 'Desconhecido')
+        reasoning = perspective.get('reasoning', '')
+        recommendation = perspective.get('recommendation', 'INDISPONÍVEL')
+        confidence = perspective.get('confidence', 0)
+        key_points = perspective.get('key_points', [])
+
+        # Visual header with agent info
+        print(f"\n   {'╭' + '─' * 66 + '╮'}")
+        print(f"   │ 🧠 PENSAMENTO DE {agent.name.upper():<54}│")
+        print(f"   │    Papel: {agent.role:<58}│")
+        print(f"   │    Daemon: {daemon:<57}│")
+        print(f"   {'├' + '─' * 66 + '┤'}")
+
+        # Show reasoning with word wrap
+        reasoning_lines = reasoning.split('\n')
+        print(f"   │ 💭 RACIOCÍNIO:                                          │")
+        for line in reasoning_lines[:5]:  # Show first 5 lines
+            wrapped_line = line[:62] if len(line) > 62 else line
+            print(f"   │    {wrapped_line:<62}│")
+        if len(reasoning_lines) > 5:
+            print(f"   │    ... ({len(reasoning_lines)-5} mais linhas de raciocínio) │")
+
+        # Show key points
+        if key_points:
+            print(f"   │                                                        │")
+            print(f"   │ 🎯 PONTOS-CHAVE:                                       │")
+            for point in key_points[:3]:
+                wrapped_point = point[:58] if len(point) > 58 else point
+                print(f"   │    • {wrapped_point:<60}│")
+
+        # Show recommendation and confidence
+        print(f"   │                                                        │")
+        confidence_bar = "█" * (confidence // 2) + "░" * (5 - confidence // 2)
+        print(f"   │ ✓ RECOMENDAÇÃO: {recommendation:<45}│")
+        print(f"   │   Confiança: {confidence_bar} ({confidence}/10)            │")
+        print(f"   {'╰' + '─' * 66 + '╯'}")
 
     async def cleanup(self):
         """Clean up and unload LLM."""
