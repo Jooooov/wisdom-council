@@ -141,27 +141,75 @@ class WisdomCouncil:
         from pathlib import Path
         from core.analysis.business_analyzer import analyze_business
         from core.orchestration.war_room import run_war_room
+        from core.research.web_researcher import research_project
+        from core.agents.devops_agent import DevOpsAgent
+        from core.memory.rag_memory import create_rag_memory
 
         project_path = Path(project['path'])
+        rag_memory = create_rag_memory()
 
-        # Step 1: Analyze business case
-        print("📊 Analyzing business context...")
+        print("\n" + "=" * 70)
+        print("🔍 COMPREHENSIVE PROJECT ANALYSIS")
+        print("=" * 70)
+
+        # Step 1: DevOps Analysis
+        print("\n📊 Step 1/4: DevOps & Git Workflow Analysis")
+        print("-" * 70)
+        devops = DevOpsAgent(str(project_path))
+        devops_status = devops.analyze_workflow()
+
+        # Step 2: Web Research
+        print("\n🌐 Step 2/4: Web Research - Finding Similar Projects & Tools")
+        print("-" * 70)
+        research_findings = await research_project(project['title'], project.get('type', 'software'))
+
+        # Step 3: Business/Code Analysis
+        print("\n📊 Step 3/4: Context & Business Analysis")
+        print("-" * 70)
         business_case = await analyze_business(str(project_path), project['title'])
 
         if business_case.get('status') == 'READY' and business_case.get('ready_for_agent_discussion'):
             # It's a business project - use War Room with LLM
-            print("\n🎯 Business project detected - Starting War Room discussion with LLM reasoning...")
-            print("   This will take more time as agents think deeply about the business viability.\n")
+            print("\n⚔️  Step 4/4: War Room Discussion with LLM Reasoning")
+            print("-" * 70)
+            print("🎯 Business project detected - Starting War Room discussion...")
+            print("   Agents are thinking deeply about the business viability with reasoning.\n")
 
             result = await run_war_room(business_case, self.agents)
 
-            # Save results
+            # Step 5: Save comprehensive results
             if result.get('status') == 'COMPLETE':
-                self._save_analysis_results(project, result)
+                self._save_comprehensive_analysis(project, {
+                    "devops": devops_status,
+                    "research": research_findings,
+                    "business": business_case,
+                    "war_room": result
+                })
+
+                # Store in memory for future learning
+                for agent in self.agents:
+                    rag_memory.store_analysis(
+                        agent.name,
+                        project['title'],
+                        {
+                            "business_case": business_case,
+                            "recommendation": result.get('recommendation', {}).get('decision'),
+                            "project_type": business_case.get('project_type')
+                        }
+                    )
         else:
             # Not a business project - do code analysis
-            print("\n💻 Code-focused project - Starting technical analysis...\n")
+            print("\n💻 Step 4/4: Technical Analysis")
+            print("-" * 70)
             await self._analyze_project_code(project)
+
+            # Store code analysis in memory
+            for agent in self.agents:
+                rag_memory.store_analysis(
+                    agent.name,
+                    project['title'],
+                    {"project_type": "code_focused"}
+                )
 
     async def _analyze_project_code(self, project: dict):
         """Real analysis of project code."""
@@ -258,43 +306,185 @@ class WisdomCouncil:
         print(f"\n✨ Code analysis complete!")
         print()
 
-    def _save_analysis_results(self, project: dict, war_room_result: dict):
-        """Save War Room analysis results to file."""
-        # Save to a markdown file
-        results_file = Path(project['path']) / "WISDOM_COUNCIL_ANALYSIS.md"
+    def _save_comprehensive_analysis(self, project: dict, analysis_data: dict):
+        """Save comprehensive analysis results to multiple files."""
+        from pathlib import Path
 
-        content = f"""# Wisdom Council Analysis Report
+        project_path = Path(project['path'])
+        results_dir = project_path / ".wisdom_council_analysis"
+        results_dir.mkdir(exist_ok=True)
 
-**Project:** {project['title']}
+        # 1. DevOps Analysis
+        devops_file = results_dir / "01_DEVOPS_ANALYSIS.md"
+        try:
+            devops_content = f"""# DevOps & Workflow Analysis
+
 **Date:** {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')}
 
-## Executive Summary
+## Git Workflow Status
 
-**Recommendation:** {war_room_result.get('recommendation', {}).get('decision', 'UNDETERMINED')}
+- Current Branch: {analysis_data['devops'].get('current_branch', 'Unknown')}
+- Branches: {', '.join(analysis_data['devops'].get('branches', []))}
+- Uncommitted Changes: {'Yes' if analysis_data['devops'].get('uncommitted_changes') else 'No'}
+
+## Code Quality
+
+{self._format_code_quality(analysis_data['devops'].get('code_quality', {}))}
+
+## Recommendations
+
+{self._format_recommendations(analysis_data['devops'].get('code_quality', {}))}
+"""
+            devops_file.write_text(devops_content)
+        except Exception as e:
+            print(f"⚠️  Could not save DevOps analysis: {e}")
+
+        # 2. Research Findings
+        research_file = results_dir / "02_RESEARCH_FINDINGS.md"
+        try:
+            research = analysis_data.get('research', {})
+            research_content = f"""# Web Research Findings
+
+## Similar Projects
+
+{self._format_research_findings(research.get('similar_projects', []))}
+
+## Useful Tools
+
+{self._format_tools(research.get('useful_tools', []))}
+
+## GitHub Repositories
+
+{self._format_github_repos(research.get('github_repositories', []))}
+
+## Best Practices
+
+{self._format_practices(research.get('best_practices', []))}
+"""
+            research_file.write_text(research_content)
+        except Exception as e:
+            print(f"⚠️  Could not save research findings: {e}")
+
+        # 3. Business Analysis
+        business_file = results_dir / "03_BUSINESS_ANALYSIS.md"
+        try:
+            business = analysis_data.get('business', {})
+            business_content = f"""# Business Analysis
+
+**Project:** {project['title']}
+
+## Market Research
+
+- Competitors Found: {len(business.get('competitive_analysis', {}).get('competitors', []))}
+- Market Gaps: {len(business.get('market_research', {}).get('gaps', []))}
+
+## Competitive Position
+
+- Viability Score: {business.get('viability_score', 0)}/100
+
+## Key Findings
+
+Advantages: {', '.join(business.get('competitive_analysis', {}).get('competitive_advantages', [])[:3])}
+
+Threats: {', '.join(business.get('competitive_analysis', {}).get('threats', [])[:3])}
+"""
+            business_file.write_text(business_content)
+        except Exception as e:
+            print(f"⚠️  Could not save business analysis: {e}")
+
+        # 4. War Room Results
+        war_room_file = results_dir / "04_WAR_ROOM_DISCUSSION.md"
+        try:
+            war_room = analysis_data.get('war_room', {})
+            war_room_content = f"""# War Room Discussion Results
+
+**Date:** {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+## Executive Decision
+
+**Recommendation:** {war_room.get('recommendation', {}).get('decision', 'UNDETERMINED')}
 
 ## Agent Perspectives
 
 """
+            for agent_name, perspective in war_room.get('perspectives', {}).items():
+                war_room_content += f"### {agent_name}\n"
+                war_room_content += f"**Recommendation:** {perspective.get('recommendation', 'UNCLEAR')}\n\n"
+                war_room_content += f"**Analysis:**\n{perspective.get('reasoning', 'N/A')}\n\n"
 
-        for agent_name, perspective in war_room_result.get('perspectives', {}).items():
-            content += f"### {agent_name}\n"
-            content += f"- **Recommendation:** {perspective.get('recommendation', 'UNCLEAR')}\n"
-            content += f"- **Analysis:**\n{perspective.get('reasoning', 'N/A')}\n\n"
+            war_room_content += f"""## Consensus
 
-        content += f"""## Consensus
+{war_room.get('consensus', {}).get('summary', 'N/A')}
 
-{war_room_result.get('consensus', {}).get('summary', 'N/A')}
+## Final Reasoning
 
-## Final Recommendation
+{war_room.get('recommendation', {}).get('reasoning', 'N/A')}
 
-{war_room_result.get('recommendation', {}).get('reasoning', 'N/A')}
+---
+
+**Status:** {war_room.get('status', 'UNKNOWN')}
+"""
+            war_room_file.write_text(war_room_content)
+        except Exception as e:
+            print(f"⚠️  Could not save war room results: {e}")
+
+        print(f"\n✅ Comprehensive analysis saved to: {results_dir}")
+
+    # ===== Helper Methods =====
+
+    def _format_code_quality(self, quality: dict) -> str:
+        """Format code quality metrics."""
+        return f"""
+- Tests: {'✅' if quality.get('has_tests') else '❌'}
+- Documentation: {'✅' if quality.get('has_docs') else '❌'}
+- README: {'✅' if quality.get('has_readme') else '❌'}
+- .gitignore: {'✅' if quality.get('has_gitignore') else '❌'}
+- Requirements: {'✅' if quality.get('has_requirements') else '❌'}
 """
 
-        try:
-            results_file.write_text(content)
-            print(f"\n✅ Analysis report saved to: {results_file}")
-        except Exception as e:
-            print(f"\n⚠️  Could not save results: {e}")
+    def _format_recommendations(self, quality: dict) -> str:
+        """Format DevOps recommendations."""
+        recommendations = []
+        if not quality.get('has_tests'):
+            recommendations.append("Add unit tests in tests/ directory")
+        if not quality.get('has_docs'):
+            recommendations.append("Create docs/ directory with documentation")
+        if not quality.get('has_readme'):
+            recommendations.append("Add comprehensive README.md")
+        if not quality.get('has_gitignore'):
+            recommendations.append("Add .gitignore file")
+        if not quality.get('has_requirements'):
+            recommendations.append("Add requirements.txt or setup.py")
+
+        return "\n".join([f"- {r}" for r in recommendations]) if recommendations else "No major recommendations"
+
+    def _format_research_findings(self, projects: list) -> str:
+        """Format research findings."""
+        if not projects:
+            return "No similar projects found"
+        return "\n".join([f"- [{p['title']}]({p['url']}): {p['snippet']}" for p in projects[:5]])
+
+    def _format_tools(self, tools: list) -> str:
+        """Format tools list."""
+        if not tools:
+            return "No tools found"
+        return "\n".join([f"- **{t['name']}**: {t['description']}" for t in tools[:5]])
+
+    def _format_github_repos(self, repos: list) -> str:
+        """Format GitHub repos."""
+        if not repos:
+            return "No repositories found"
+        return "\n".join([f"- [{r['name']}]({r['url']}) ({r['language']}): {r['stars']} stars" for r in repos[:5]])
+
+    def _format_practices(self, practices: list) -> str:
+        """Format best practices."""
+        if not practices:
+            return "No practices found"
+        return "\n".join([f"- [{p['topic']}]({p['url']}): {p['details']}" for p in practices[:5]])
+
+    def _save_analysis_results(self, project: dict, war_room_result: dict):
+        """Save War Room analysis results to file (legacy method)."""
+        self._save_comprehensive_analysis(project, {"war_room": war_room_result})
 
     async def _search_context(self, project_name: str):
         """Search for context using Perplexity MCP."""
@@ -384,7 +574,11 @@ class WisdomCouncil:
         """Run the Wisdom Council."""
         self.print_header()
         self.show_status()
-        self.interactive_menu()
+
+        # Use new CLI Menu instead of old interactive menu
+        from core.ui import CLIMenu
+        menu = CLIMenu(self)
+        menu.run()
 
 
 if __name__ == "__main__":
