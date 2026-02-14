@@ -193,7 +193,7 @@ class WisdomCouncil:
             print("🎯 Business project detected - Starting War Room discussion...")
             print("   Agents are thinking deeply about the business viability with reasoning.\n")
 
-            result = await run_war_room(business_case, self.agents)
+            result = await run_war_room(business_case, self.agents, str(project_path))
 
             # Step 5: Save comprehensive results
             if result.get('status') == 'COMPLETE':

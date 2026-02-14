@@ -14,25 +14,38 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from core.llm import create_ram_manager, create_mlx_loader
+from core.research.manual_inputs import get_context_for_agent
 
 
 class WarRoom:
     """Real-time agent collaboration with LLM reasoning."""
 
-    def __init__(self, business_case: Dict[str, Any], agents: List[Any]):
+    def __init__(self, business_case: Dict[str, Any], agents: List[Any], project_path: str = None):
         """Initialize war room with business case and agents."""
         self.business_case = business_case
         self.agents = agents
+        self.project_path = project_path
         self.llm_loader = None
         self.ram_manager = None
         self.discussion_log = []
         self.agent_perspectives = {}
+        self.manual_inputs_context = ""
 
     async def prepare(self) -> bool:
         """Prepare LLM and check RAM."""
         print("\n" + "=" * 70)
-        print("🧠 WAR ROOM INITIALIZATION")
+        print("🧠 INICIALIZAÇÃO DA SALA DE GUERRA")
         print("=" * 70)
+
+        # Read manual inputs if project path provided
+        if self.project_path:
+            print("\n📂 Lendo inputs manuais do projeto...")
+            try:
+                self.manual_inputs_context = get_context_for_agent(self.project_path)
+                if self.manual_inputs_context:
+                    print("   ✅ Inputs críticos do utilizador carregados")
+            except Exception as e:
+                print(f"   ℹ️  Nenhum input manual encontrado: {e}")
 
         # Check RAM
         self.ram_manager = create_ram_manager()
@@ -42,56 +55,56 @@ class WarRoom:
         print(f"\n{message}")
 
         if not can_load:
-            print("\n❌ Insufficient RAM to run War Room with LLM reasoning")
+            print("\n❌ RAM insuficiente para executar Sala de Guerra com raciocínio LLM")
             return False
 
         # Load LLM
-        print("\n⏳ Loading DeepSeek-R1 LLM for agent reasoning...")
+        print("\n⏳ Carregando DeepSeek-R1 LLM para raciocínio de agentes...")
         success = await self.llm_loader.load()
 
         if success:
-            print("✅ LLM loaded - War Room ready\n")
+            print("✅ LLM carregado - Sala de Guerra pronta\n")
             return True
         else:
-            print("❌ Failed to load LLM")
+            print("❌ Falha ao carregar LLM")
             return False
 
     async def conduct_discussion(self) -> Dict[str, Any]:
         """Conduct full war room discussion with LLM-based agent reasoning."""
         print("\n" + "=" * 70)
-        print("⚔️  WAR ROOM DISCUSSION - REAL AGENT COLLABORATION")
+        print("⚔️  DISCUSSÃO NA SALA DE GUERRA - COLABORAÇÃO REAL DE AGENTES")
         print("=" * 70)
-        print(f"\nProject: {self.business_case.get('project_name')}")
-        print(f"Viability Score: {self.business_case.get('viability_score', 0)}/100")
+        print(f"\nProjeto: {self.business_case.get('project_name')}")
+        print(f"Índice de Viabilidade: {self.business_case.get('viability_score', 0)}/100")
 
         try:
             # Phase 1: Individual Agent Analysis
             print("\n" + "-" * 70)
-            print("📍 PHASE 1: Individual Agent Analysis (with LLM Reasoning)")
+            print("📍 FASE 1: Análise Individual dos Agentes (com Raciocínio LLM)")
             print("-" * 70)
 
             for agent in self.agents:
-                print(f"\n🧙 {agent.name} ({agent.role}) is analyzing...")
+                print(f"\n🧙 {agent.name} ({agent.role}) está analisando...")
                 perspective = await self._get_agent_reasoning(agent)
                 self.agent_perspectives[agent.name] = perspective
 
             # Phase 2: Open Discussion
             print("\n" + "-" * 70)
-            print("💬 PHASE 2: Open Discussion Between Agents")
+            print("💬 FASE 2: Discussão Aberta Entre Agentes")
             print("-" * 70)
 
             discussion = await self._facilitate_discussion()
 
             # Phase 3: Consensus Building
             print("\n" + "-" * 70)
-            print("🤝 PHASE 3: Consensus Building")
+            print("🤝 FASE 3: Construção do Consenso")
             print("-" * 70)
 
             consensus = await self._build_consensus()
 
             # Phase 4: Final Recommendation
             print("\n" + "-" * 70)
-            print("🎯 PHASE 4: Final Recommendation (GO / NO-GO)")
+            print("🎯 FASE 4: Recomendação Final (SIM / NÃO)")
             print("-" * 70)
 
             recommendation = await self._generate_final_recommendation()
@@ -105,7 +118,7 @@ class WarRoom:
             }
 
         except Exception as e:
-            print(f"\n❌ War Room discussion failed: {e}")
+            print(f"\n❌ Discussão da Sala de Guerra falhou: {e}")
             import traceback
             traceback.print_exc()
             return {"status": "FAILED", "error": str(e)}
@@ -122,8 +135,7 @@ class WarRoom:
         try:
             reasoning = await self.llm_loader.generate(
                 prompt=prompt,
-                max_tokens=300,
-                temperature=0.7
+                max_tokens=300
             )
 
             perspective = {
@@ -137,9 +149,9 @@ class WarRoom:
             }
 
             # Print perspective
-            print(f"   ✅ Analysis complete")
+            print(f"   ✅ Análise completa")
             if perspective['recommendation']:
-                print(f"      Recommendation: {perspective['recommendation']}")
+                print(f"      Recomendação: {perspective['recommendation']}")
 
             self.discussion_log.append({
                 "speaker": agent.name,
@@ -150,25 +162,24 @@ class WarRoom:
             return perspective
 
         except Exception as e:
-            print(f"   ⚠️  Error getting reasoning: {e}")
+            print(f"   ⚠️  Erro ao obter raciocínio: {e}")
             return {
                 "agent": agent.name,
                 "role": agent.role,
-                "reasoning": "Analysis unavailable",
+                "reasoning": "Análise indisponível",
                 "error": str(e)
             }
 
     async def _facilitate_discussion(self) -> str:
         """Facilitate discussion between agents based on their perspectives."""
-        print("\n🎤 Agents are discussing their views...\n")
+        print("\n🎤 Os agentes estão discutindo suas perspectivas...\n")
 
         discussion_prompt = self._build_discussion_prompt()
 
         try:
             discussion = await self.llm_loader.generate(
                 prompt=discussion_prompt,
-                max_tokens=400,
-                temperature=0.8
+                max_tokens=400
             )
 
             self.discussion_log.append({
@@ -181,8 +192,8 @@ class WarRoom:
             return discussion
 
         except Exception as e:
-            print(f"⚠️  Discussion generation failed: {e}")
-            return "Discussion could not be generated"
+            print(f"⚠️  Falha ao gerar discussão: {e}")
+            return "Discussão não pôde ser gerada"
 
     async def _build_consensus(self) -> Dict[str, Any]:
         """Build consensus from all agent perspectives."""
@@ -191,12 +202,11 @@ class WarRoom:
         try:
             consensus_text = await self.llm_loader.generate(
                 prompt=consensus_prompt,
-                max_tokens=300,
-                temperature=0.6
+                max_tokens=300
             )
 
             go_count = sum(1 for p in self.agent_perspectives.values()
-                          if "GO" in p.get("recommendation", "").upper())
+                          if "SIM" in p.get("recommendation", "").upper() or "GO" in p.get("recommendation", "").upper())
             total = len(self.agent_perspectives)
             agreement = (go_count / total * 100) if total > 0 else 0
 
@@ -207,15 +217,15 @@ class WarRoom:
                 "agents_favoring_nogo": total - go_count
             }
 
-            print(f"\n✅ Consensus: {int(agreement)}% of agents favor GO")
+            print(f"\n✅ Consenso: {int(agreement)}% dos agentes favorecem SIM")
             print(f"   ({go_count}/{total})")
 
             return consensus
 
         except Exception as e:
-            print(f"⚠️  Consensus generation failed: {e}")
+            print(f"⚠️  Falha ao gerar consenso: {e}")
             return {
-                "summary": "Consensus could not be determined",
+                "summary": "Consenso não pôde ser determinado",
                 "error": str(e)
             }
 
@@ -226,23 +236,22 @@ class WarRoom:
         try:
             recommendation_text = await self.llm_loader.generate(
                 prompt=recommendation_prompt,
-                max_tokens=350,
-                temperature=0.7
+                max_tokens=350
             )
 
             # Determine GO/NO-GO
-            is_go = "GO" in recommendation_text.upper()
+            is_go = "SIM" in recommendation_text.upper() or "GO" in recommendation_text.upper()
 
             recommendation = {
-                "decision": "🟢 GO - PROCEED WITH PROJECT" if is_go else "🔴 NO-GO - DO NOT PROCEED",
+                "decision": "🟢 SIM - PROCEDER COM O PROJETO" if is_go else "🔴 NÃO - NÃO PROCEDER",
                 "reasoning": recommendation_text,
                 "viability_score": self.business_case.get("viability_score", 0),
                 "confidence": 8 if is_go else 7  # Based on LLM reasoning
             }
 
-            print(f"\n{'🟢' if is_go else '🔴'} FINAL DECISION:")
+            print(f"\n{'🟢' if is_go else '🔴'} DECISÃO FINAL:")
             print(f"   {recommendation['decision']}")
-            print(f"\n📋 Reasoning (from LLM analysis):")
+            print(f"\n📋 Raciocínio (da análise LLM):")
             for line in recommendation_text.split('\n')[:3]:
                 if line.strip():
                     print(f"   • {line.strip()}")
@@ -250,9 +259,9 @@ class WarRoom:
             return recommendation
 
         except Exception as e:
-            print(f"⚠️  Recommendation generation failed: {e}")
+            print(f"⚠️  Falha ao gerar recomendação: {e}")
             return {
-                "decision": "UNDETERMINED",
+                "decision": "NÃO DETERMINADO",
                 "error": str(e)
             }
 
@@ -262,78 +271,90 @@ class WarRoom:
         """Build business case summary tailored for specific agent."""
         case = self.business_case
         summary = f"""
-PROJECT: {case.get('project_name')}
-TYPE: {case.get('project_type', 'Unknown')}
+PROJETO: {case.get('project_name')}
+TIPO: {case.get('project_type', 'Desconhecido')}
 
-MARKET DATA:
-- Viability Score: {case.get('viability_score', 0)}/100
-- Competitors: {len(case.get('competitive_analysis', {}).get('competitors', []))}
-- Market Gaps: {len(case.get('market_research', {}).get('gaps', []))}
+DADOS DE MERCADO:
+- Índice de Viabilidade: {case.get('viability_score', 0)}/100
+- Concorrentes: {len(case.get('competitive_analysis', {}).get('competitors', []))}
+- Lacunas de Mercado: {len(case.get('market_research', {}).get('gaps', []))}
 
-KEY FINDINGS:
-Advantages: {', '.join(case.get('competitive_analysis', {}).get('competitive_advantages', [])[:2])}
-Threats: {', '.join(case.get('competitive_analysis', {}).get('threats', [])[:2])}
+DESCOBERTAS-CHAVE:
+Vantagens: {', '.join(case.get('competitive_analysis', {}).get('competitive_advantages', [])[:2])}
+Ameaças: {', '.join(case.get('competitive_analysis', {}).get('threats', [])[:2])}
 """
         return summary.strip()
 
     def _create_agent_prompt(self, agent, business_summary: str) -> str:
         """Create personality-specific analysis prompt for agent."""
+        # Include manual inputs context if available
+        manual_context = ""
+        if self.manual_inputs_context:
+            manual_context = f"\n{self.manual_inputs_context}\n"
+
         role_prompts = {
-            "analyst": f"""You are {agent.name}, a sharp analyst with keen insight into data and patterns.
+            "analyst": f"""{manual_context}
+Você é {agent.name}, um analista perspicaz com excelente capacidade de ver padrões nos dados.
 
-Analyze this business case focusing on METRICS, DATA, and MARKET TRENDS:
+Analise este caso de negócio focando em MÉTRICAS, DADOS e TENDÊNCIAS DE MERCADO:
 {business_summary}
 
-Provide your analysis as {agent.name} would - data-driven, questioning assumptions, finding hidden patterns.
-What do the numbers tell you? Is this viable?""",
+Forneça sua análise como {agent.name} faria - orientada por dados, questionando pressupostos, encontrando padrões ocultos.
+O que os números te dizem? Isto é viável? Responda em português.""",
 
-            "architect": f"""You are {agent.name}, a strategic architect focused on structure and scalability.
+            "architect": f"""{manual_context}
+Você é {agent.name}, um arquiteto estratégico focado em estrutura e escalabilidade.
 
-Analyze this business case focusing on STRUCTURE, SCALABILITY, and FEASIBILITY:
+Analise este caso de negócio focando em ESTRUTURA, ESCALABILIDADE e VIABILIDADE:
 {business_summary}
 
-How is this business structured? Can it scale? What's the foundational weakness?
-Provide your architectural assessment.""",
+Como esse negócio está estruturado? Pode escalar? Qual é a fraqueza fundamental?
+Forneça sua avaliação arquitetônica. Responda em português.""",
 
-            "developer": f"""You are {agent.name}, a decisive operator focused on EXECUTION and TECHNICAL VIABILITY.
+            "developer": f"""{manual_context}
+Você é {agent.name}, um operador decisivo focado em EXECUÇÃO e VIABILIDADE TÉCNICA.
 
-Analyze this business case focusing on EXECUTION, RESOURCES, and TECHNICAL FEASIBILITY:
+Analise este caso de negócio focando em EXECUÇÃO, RECURSOS e VIABILIDADE TÉCNICA:
 {business_summary}
 
-Can this actually be built? Do we have the resources? What's the execution risk?
-Give your execution assessment.""",
+Isso pode realmente ser construído? Temos os recursos? Qual é o risco de execução?
+Dê sua avaliação de execução. Responda em português.""",
 
-            "researcher": f"""You are {agent.name}, a strategic researcher with deep market knowledge.
+            "researcher": f"""{manual_context}
+Você é {agent.name}, um pesquisador estratégico com profundo conhecimento de mercado.
 
-Analyze this business case focusing on MARKET DEPTH, COMPETITIVE INTELLIGENCE, and OPPORTUNITIES:
+Analise este caso de negócio focando em PROFUNDIDADE DE MERCADO, INTELIGÊNCIA COMPETITIVA e OPORTUNIDADES:
 {business_summary}
 
-What's the deeper market story? Who are the real competitors? What opportunities are hidden?
-Provide your market research perspective.""",
+Qual é a história mais profunda do mercado? Quem são os verdadeiros concorrentes? Que oportunidades estão ocultas?
+Forneça sua perspectiva de pesquisa de mercado. Responda em português.""",
 
-            "writer": f"""You are {agent.name}, a strategic communicator focused on POSITIONING and GO-TO-MARKET.
+            "writer": f"""{manual_context}
+Você é {agent.name}, um comunicador estratégico focado em POSICIONAMENTO e ENTRADA NO MERCADO.
 
-Analyze this business case focusing on POSITIONING, MESSAGING, and MARKET ENTRY:
+Analise este caso de negócio focando em POSICIONAMENTO, MENSAGEM e ENTRADA NO MERCADO:
 {business_summary}
 
-How do we position this? What's our story? How do we win in the market?
-Provide your strategic communication perspective.""",
+Como posicionamos isso? Qual é nossa história? Como ganhamos no mercado?
+Forneça sua perspectiva de comunicação estratégica. Responda em português.""",
 
-            "validator": f"""You are {agent.name}, a careful validator focused on RISKS and ASSUMPTIONS.
+            "validator": f"""{manual_context}
+Você é {agent.name}, um validador cuidadoso focado em RISCOS e PRESSUPOSTOS.
 
-Analyze this business case focusing on RISKS, ASSUMPTIONS, and VALIDATION:
+Analise este caso de negócio focando em RISCOS, PRESSUPOSTOS e VALIDAÇÃO:
 {business_summary}
 
-What could go wrong? What are we assuming that might be wrong? What needs validation?
-Provide your risk assessment perspective.""",
+O que poderia dar errado? O que estamos assumindo que poderia estar errado? O que precisa validação?
+Forneça sua perspectiva de avaliação de risco. Responda em português.""",
 
-            "coordinator": f"""You are {agent.name}, a visionary coordinator focused on STRATEGY and ALIGNMENT.
+            "coordinator": f"""{manual_context}
+Você é {agent.name}, um coordenador visionário focado em ESTRATÉGIA e ALINHAMENTO.
 
-Analyze this business case as a STRATEGIC LEADER:
+Analise este caso de negócio como um LÍDER ESTRATÉGICO:
 {business_summary}
 
-Is this aligned with our vision? Do all pieces fit together? Is this worth our time and resources?
-Provide your strategic leadership perspective.""",
+Isto está alinhado com nossa visão? Todos os elementos se encaixam? Vale nossa tempo e recursos?
+Forneça sua perspectiva de liderança estratégica. Responda em português.""",
         }
 
         # Match role to prompt
@@ -342,57 +363,57 @@ Provide your strategic leadership perspective.""",
                 return prompt
 
         # Default
-        return f"Analyze this business case: {business_summary}\n\nWhat is your professional opinion?"
+        return f"{manual_context}Analise este caso de negócio: {business_summary}\n\nQual é sua opinião profissional? Responda em português."
 
     def _build_discussion_prompt(self) -> str:
         """Build prompt for agents to discuss together."""
         perspectives_summary = "\n".join([
-            f"- {name}: {p.get('recommendation', 'Unclear')}"
+            f"- {name}: {p.get('recommendation', 'Indisponível')}"
             for name, p in self.agent_perspectives.items()
         ])
 
-        return f"""The agents are now having an open discussion about the business case:
+        return f"""Os agentes estão agora tendo uma discussão aberta sobre o caso de negócio:
 {self.business_case.get('project_name')}
 
-Current positions:
+Posições atuais:
 {perspectives_summary}
 
-Have a realistic, professional discussion between the agents. Include:
-- Areas of agreement
-- Points of disagreement
-- Questions that need answering
-- Concerns raised
-- Potential compromises
+Tenha uma discussão realista e profissional entre os agentes. Inclua:
+- Áreas de concordância
+- Pontos de discordância
+- Perguntas que precisam resposta
+- Preocupações levantadas
+- Possíveis compromissos
 
-Write the discussion as a natural conversation with insights from each perspective."""
+Escreva a discussão como uma conversa natural com insights de cada perspectiva. Responda em português."""
 
     def _build_consensus_prompt(self) -> str:
         """Build prompt for consensus building."""
-        return f"""Based on the analysis from {len(self.agent_perspectives)} specialists,
-determine the consensus on the business case: {self.business_case.get('project_name')}
+        return f"""Com base na análise de {len(self.agent_perspectives)} especialistas,
+determine o consenso sobre o caso de negócio: {self.business_case.get('project_name')}
 
-The team consists of experts in:
+A equipe consiste em especialistas em:
 {', '.join([f"{name} ({p.get('role')})" for name, p in self.agent_perspectives.items()])}
 
-Summarize the consensus position. Do the experts agree? Where do they diverge?
-Is there a clear lean towards GO or NO-GO?"""
+Resuma a posição do consenso. Os especialistas concordam? Onde eles divergem?
+Há uma inclinação clara para SIM ou NÃO? Responda em português."""
 
     def _build_recommendation_prompt(self) -> str:
         """Build prompt for final recommendation."""
-        return f"""As a synthesis of expert analysis, provide a final GO/NO-GO recommendation for:
+        return f"""Como síntese da análise de especialistas, forneça uma recomendação final SIM/NÃO para:
 {self.business_case.get('project_name')}
 
-Viability Score: {self.business_case.get('viability_score', 0)}/100
+Índice de Viabilidade: {self.business_case.get('viability_score', 0)}/100
 
-Based on:
-- Market analysis
-- Competitive position
-- Team expertise
-- Risk assessment
-- Financial viability
+Com base em:
+- Análise de mercado
+- Posição competitiva
+- Experiência da equipe
+- Avaliação de risco
+- Viabilidade financeira
 
-Should we proceed (GO) or pivot/cancel (NO-GO)?
-Provide clear reasoning for your recommendation."""
+Devemos proceder (SIM) ou pivotar/cancelar (NÃO)?
+Forneça raciocínio claro para sua recomendação. Responda em português."""
 
     def _extract_key_points(self, text: str) -> List[str]:
         """Extract key points from reasoning text."""
@@ -420,17 +441,17 @@ Provide clear reasoning for your recommendation."""
         """Clean up and unload LLM."""
         if self.llm_loader:
             self.llm_loader.unload()
-            print("\n✅ LLM unloaded, resources freed")
+            print("\n✅ LLM descarregado, recursos libertados")
 
 
-async def run_war_room(business_case: Dict[str, Any], agents: List[Any]) -> Dict[str, Any]:
+async def run_war_room(business_case: Dict[str, Any], agents: List[Any], project_path: str = None) -> Dict[str, Any]:
     """Factory function to run war room discussion."""
-    war_room = WarRoom(business_case, agents)
+    war_room = WarRoom(business_case, agents, project_path)
 
     # Prepare
     ready = await war_room.prepare()
     if not ready:
-        return {"status": "FAILED", "error": "Could not prepare War Room"}
+        return {"status": "FAILED", "error": "Não foi possível preparar a Sala de Guerra"}
 
     # Conduct discussion
     result = await war_room.conduct_discussion()

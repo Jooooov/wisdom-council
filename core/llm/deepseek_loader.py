@@ -260,32 +260,17 @@ class MLXLLMLoader:
         try:
             from mlx_lm import generate
 
-            logger.info(f"Generating with max_tokens={max_tokens}, temperature={temperature}")
+            logger.info(f"Generating with max_tokens={max_tokens}")
 
-            # Generate using MLX - use simple API call (parameters handled by mlx-lm)
-            try:
-                # Try with temperature parameter first
-                response = generate(
-                    self.model,
-                    self.tokenizer,
-                    prompt=prompt,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    verbose=False
-                )
-            except TypeError as e:
-                if "temperature" in str(e):
-                    # Fallback: generate without temperature parameter
-                    logger.warning(f"Temperature parameter not supported, using default: {e}")
-                    response = generate(
-                        self.model,
-                        self.tokenizer,
-                        prompt=prompt,
-                        max_tokens=max_tokens,
-                        verbose=False
-                    )
-                else:
-                    raise
+            # Generate using MLX - temperature not supported in current version
+            # Use default sampling parameters
+            response = generate(
+                self.model,
+                self.tokenizer,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                verbose=False
+            )
 
             return response.strip()
 
