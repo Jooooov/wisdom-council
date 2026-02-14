@@ -128,14 +128,42 @@ class WisdomCouncil:
         return projects
 
     def work_on_project(self, project: dict):
-        """Have agents work on a project - REAL CODE ANALYSIS."""
-        print(f"\n🚀 STARTING REAL ANALYSIS: {project['title']}")
+        """Have agents work on a project - BUSINESS ANALYSIS or CODE ANALYSIS."""
+        print(f"\n🚀 STARTING ANALYSIS: {project['title']}")
         print("-" * 70)
-        print(f"⏳ This analyzes actual code - may take a moment...\n")
+        print(f"⏳ Analyzing project structure and context...\n")
 
-        asyncio.run(self._analyze_project_real(project))
+        # Determine if this is a business project
+        asyncio.run(self._analyze_project_intelligent(project))
 
-    async def _analyze_project_real(self, project: dict):
+    async def _analyze_project_intelligent(self, project: dict):
+        """Intelligent analysis - detects if business project and runs appropriate analysis."""
+        from pathlib import Path
+        from core.analysis.business_analyzer import analyze_business
+        from core.orchestration.war_room import run_war_room
+
+        project_path = Path(project['path'])
+
+        # Step 1: Analyze business case
+        print("📊 Analyzing business context...")
+        business_case = await analyze_business(str(project_path), project['title'])
+
+        if business_case.get('status') == 'READY' and business_case.get('ready_for_agent_discussion'):
+            # It's a business project - use War Room with LLM
+            print("\n🎯 Business project detected - Starting War Room discussion with LLM reasoning...")
+            print("   This will take more time as agents think deeply about the business viability.\n")
+
+            result = await run_war_room(business_case, self.agents)
+
+            # Save results
+            if result.get('status') == 'COMPLETE':
+                self._save_analysis_results(project, result)
+        else:
+            # Not a business project - do code analysis
+            print("\n💻 Code-focused project - Starting technical analysis...\n")
+            await self._analyze_project_code(project)
+
+    async def _analyze_project_code(self, project: dict):
         """Real analysis of project code."""
         from pathlib import Path
 
@@ -227,8 +255,46 @@ class WisdomCouncil:
             agent.complete_task(success=True)
             print(f"✅ {agent.name}: +1 experience (score: {agent.learning_score:.2f})")
 
-        print(f"\n✨ Real analysis complete!")
+        print(f"\n✨ Code analysis complete!")
         print()
+
+    def _save_analysis_results(self, project: dict, war_room_result: dict):
+        """Save War Room analysis results to file."""
+        # Save to a markdown file
+        results_file = Path(project['path']) / "WISDOM_COUNCIL_ANALYSIS.md"
+
+        content = f"""# Wisdom Council Analysis Report
+
+**Project:** {project['title']}
+**Date:** {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+## Executive Summary
+
+**Recommendation:** {war_room_result.get('recommendation', {}).get('decision', 'UNDETERMINED')}
+
+## Agent Perspectives
+
+"""
+
+        for agent_name, perspective in war_room_result.get('perspectives', {}).items():
+            content += f"### {agent_name}\n"
+            content += f"- **Recommendation:** {perspective.get('recommendation', 'UNCLEAR')}\n"
+            content += f"- **Analysis:**\n{perspective.get('reasoning', 'N/A')}\n\n"
+
+        content += f"""## Consensus
+
+{war_room_result.get('consensus', {}).get('summary', 'N/A')}
+
+## Final Recommendation
+
+{war_room_result.get('recommendation', {}).get('reasoning', 'N/A')}
+"""
+
+        try:
+            results_file.write_text(content)
+            print(f"\n✅ Analysis report saved to: {results_file}")
+        except Exception as e:
+            print(f"\n⚠️  Could not save results: {e}")
 
     async def _search_context(self, project_name: str):
         """Search for context using Perplexity MCP."""
