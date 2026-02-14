@@ -1,16 +1,18 @@
 """
-Manual Inputs Reader - Incorporates user-provided context into analysis
+Context Reader - Reads project contexto.md and estrutura.md from Obsidian and Apps
 
-Reads from project's "manual_inputs" or "manual inputs" folder
-to gather critical context that agents should consider.
+Follows the convention defined in AGENTS.md:
+- Each project has contexto.md (project context)
+- Each project has estrutura.md (project structure)
+- Agents receive COMBINED context from both sources (Obsidian + Apps)
 """
 
 from pathlib import Path
 from typing import Dict, List, Any
 
 
-class ManualInputsReader:
-    """Reads and incorporates manual inputs from project directories."""
+class ContextReader:
+    """Reads contexto.md and estrutura.md from project directories."""
 
     def __init__(self, project_path: str, additional_paths: list = None):
         """Initialize reader.
@@ -22,176 +24,129 @@ class ManualInputsReader:
         self.project_path = Path(project_path)
         self.additional_paths = [Path(p) for p in (additional_paths or [])]
         self.all_paths = [self.project_path] + self.additional_paths
-        self.inputs = {
-            "raw_files": [],
-            "context": "",
-            "objectives": [],
-            "constraints": [],
-            "critical_points": [],
-            "user_notes": ""
+        self.contexts = {
+            "contexto": [],  # List of (source, content) tuples
+            "estrutura": [],  # List of (source, content) tuples
+            "combined": ""  # Final combined context
         }
 
-    def read_inputs(self) -> Dict[str, Any]:
-        """Read all manual inputs from project (searches multiple paths)."""
-        print("\n🔍 Buscando manual inputs (contexto crítico)...")
+    def read_contexts(self) -> Dict[str, Any]:
+        """Read contexto.md and estrutura.md from all project paths."""
+        print("\n📚 Lendo contextos do projeto (contexto.md + estrutura.md)...")
 
-        # Try different folder names
-        possible_names = [
-            "manual_inputs",
-            "manual inputs",
-            "inputs",
-            "manual",
-            "context",
-            "MANUAL_INPUTS",
-            "MANUAL INPUTS"
-        ]
-
-        inputs_folder = None
-        found_in_path = None
-
-        # Search in all provided paths
+        # Search for context files in all paths
         for project_path in self.all_paths:
             if not project_path.exists():
                 continue
 
-            for name in possible_names:
-                candidate = project_path / name
-                if candidate.exists() and candidate.is_dir():
-                    inputs_folder = candidate
-                    found_in_path = project_path
-                    break
+            source_name = "Obsidian" if project_path != self.project_path else "Apps"
 
-            if inputs_folder:
-                break
+            # Read contexto.md
+            contexto_file = project_path / "contexto.md"
+            if contexto_file.exists():
+                try:
+                    with open(contexto_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        self.contexts["contexto"].append((source_name, content))
+                        print(f"   ✅ contexto.md encontrado ({source_name})")
+                except Exception as e:
+                    print(f"   ⚠️  Erro ao ler contexto.md ({source_name}): {e}")
 
-        if not inputs_folder:
-            print("   ℹ️  Nenhuma pasta de manual inputs encontrada")
-            return self.inputs
+            # Read estrutura.md
+            estrutura_file = project_path / "estrutura.md"
+            if estrutura_file.exists():
+                try:
+                    with open(estrutura_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        self.contexts["estrutura"].append((source_name, content))
+                        print(f"   ✅ estrutura.md encontrado ({source_name})")
+                except Exception as e:
+                    print(f"   ⚠️  Erro ao ler estrutura.md ({source_name}): {e}")
 
-        relative_path = "Apps" if found_in_path == self.project_path else "Obsidian"
-        print(f"   ✅ Pasta encontrada ({relative_path}): {inputs_folder.name}")
+        # Combine contexts if found any
+        if self.contexts["contexto"] or self.contexts["estrutura"]:
+            self._combine_contexts()
+            print(f"   ✅ Contextos combinados de múltiplas fontes")
+        else:
+            print("   ℹ️  Nenhum ficheiro de contexto encontrado")
 
-        # Read all files in the folder
-        self._read_folder_contents(inputs_folder)
+        return self.contexts
 
-        print(f"   ✅ Lidos {len(self.inputs['raw_files'])} ficheiros")
+    def _combine_contexts(self):
+        """Combine contexts from multiple sources into single formatted context."""
+        parts = []
 
-        return self.inputs
+        # Combine all contexto.md files
+        if self.contexts["contexto"]:
+            parts.append("=== CONTEXTO DO PROJETO ===\n")
+            for source, content in self.contexts["contexto"]:
+                parts.append(f"\n📍 Fonte: {source}\n")
+                parts.append(content)
+                parts.append("\n")
 
-    def _read_folder_contents(self, folder: Path):
-        """Read all files from the inputs folder."""
-        try:
-            for file_path in folder.rglob("*"):
-                if not file_path.is_file():
-                    continue
+        # Combine all estrutura.md files
+        if self.contexts["estrutura"]:
+            parts.append("\n=== ESTRUTURA DO PROJETO ===\n")
+            for source, content in self.contexts["estrutura"]:
+                parts.append(f"\n🏗️  Fonte: {source}\n")
+                parts.append(content)
+                parts.append("\n")
 
-                if file_path.suffix in [".md", ".txt", ".json", ".csv", ".yaml", ".yml"]:
-                    content = self._read_file(file_path)
-                    if content:
-                        self.inputs["raw_files"].append({
-                            "filename": file_path.name,
-                            "content": content
-                        })
-
-                        # Parse content for structured data
-                        self._parse_content(file_path.name, content)
-
-        except Exception as e:
-            print(f"   ⚠️  Erro ao ler inputs: {e}")
-
-    def _read_file(self, file_path: Path) -> str:
-        """Read a single file."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        except Exception as e:
-            print(f"   ⚠️  Erro ao ler {file_path.name}: {e}")
-            return ""
-
-    def _parse_content(self, filename: str, content: str):
-        """Parse content to extract structured information."""
-        # Extract objectives
-        if "objetivo" in filename.lower() or "goal" in filename.lower():
-            lines = [l.strip() for l in content.split('\n') if l.strip()]
-            self.inputs["objectives"].extend(lines[:5])
-
-        # Extract constraints
-        if "constraint" in filename.lower() or "restrição" in filename.lower():
-            lines = [l.strip() for l in content.split('\n') if l.strip()]
-            self.inputs["constraints"].extend(lines[:5])
-
-        # Extract critical points
-        if "critical" in filename.lower() or "importante" in filename.lower():
-            lines = [l.strip() for l in content.split('\n') if l.strip()]
-            self.inputs["critical_points"].extend(lines[:5])
-
-        # Accumulate full context
-        self.inputs["user_notes"] += f"\n## {filename}\n{content}\n"
+        self.contexts["combined"] = "\n".join(parts) if parts else ""
 
     def get_context_for_agent(self) -> str:
         """Get formatted context to include in agent prompts."""
-        if not self.inputs["raw_files"]:
+        if not self.contexts["combined"]:
             return ""
 
         context = """
-=== CONTEXTO CRÍTICO DO UTILIZADOR ===
-(Informação fornecida manualmente - TEM PRIORIDADE MÁXIMA)
+=== CONTEXTO CRÍTICO DO PROJETO ===
+(Lido de contexto.md + estrutura.md - FONTE PRIMÁRIA)
 
 """
-
-        if self.inputs["objectives"]:
-            context += "📍 OBJECTIVOS:\n"
-            for obj in self.inputs["objectives"][:3]:
-                context += f"  • {obj}\n"
-            context += "\n"
-
-        if self.inputs["constraints"]:
-            context += "⚠️  RESTRIÇÕES/LIMITAÇÕES:\n"
-            for cons in self.inputs["constraints"][:3]:
-                context += f"  • {cons}\n"
-            context += "\n"
-
-        if self.inputs["critical_points"]:
-            context += "🔴 PONTOS CRÍTICOS:\n"
-            for point in self.inputs["critical_points"][:3]:
-                context += f"  • {point}\n"
-            context += "\n"
-
-        context += "📝 NOTAS COMPLETAS DO UTILIZADOR:\n"
-        context += self.inputs["user_notes"][:2000]  # Limit to 2000 chars
+        context += self.contexts["combined"]
+        context += "\n(Fim do contexto do projeto)\n"
 
         return context
 
     def get_summary(self) -> str:
-        """Get summary of inputs for display."""
-        if not self.inputs["raw_files"]:
-            return "Sem inputs manuais encontrados"
+        """Get summary of found contexts."""
+        if not self.contexts["contexto"] and not self.contexts["estrutura"]:
+            return "Sem contexto de projeto encontrado"
 
-        summary = f"Inputs encontrados ({len(self.inputs['raw_files'])} ficheiros):\n"
-        for file_info in self.inputs["raw_files"]:
-            summary += f"  • {file_info['filename']} ({len(file_info['content'])} chars)\n"
+        summary = "Contextos encontrados:\n"
+        for source, _ in self.contexts["contexto"]:
+            summary += f"  • contexto.md ({source})\n"
+        for source, _ in self.contexts["estrutura"]:
+            summary += f"  • estrutura.md ({source})\n"
 
         return summary
 
 
-def read_manual_inputs(project_path: str, additional_paths: list = None) -> Dict[str, Any]:
-    """Factory function to read manual inputs.
+def read_project_context(project_path: str, additional_paths: list = None) -> Dict[str, Any]:
+    """Factory function to read project context.
 
     Args:
         project_path: Primary project path
         additional_paths: Additional paths to search (e.g., Obsidian path for merged projects)
     """
-    reader = ManualInputsReader(project_path, additional_paths)
-    return reader.read_inputs()
+    reader = ContextReader(project_path, additional_paths)
+    return reader.read_contexts()
 
 
 def get_context_for_agent(project_path: str, additional_paths: list = None) -> str:
-    """Get formatted context from manual inputs.
+    """Get formatted context from project files.
 
     Args:
         project_path: Primary project path
         additional_paths: Additional paths to search (e.g., Obsidian path for merged projects)
     """
-    reader = ManualInputsReader(project_path, additional_paths)
-    reader.read_inputs()
+    reader = ContextReader(project_path, additional_paths)
+    reader.read_contexts()
     return reader.get_context_for_agent()
+
+
+# Backwards compatibility - old manual_inputs functions now redirect to context functions
+def read_manual_inputs(project_path: str, additional_paths: list = None) -> Dict[str, Any]:
+    """Deprecated: Use read_project_context instead."""
+    return read_project_context(project_path, additional_paths)
