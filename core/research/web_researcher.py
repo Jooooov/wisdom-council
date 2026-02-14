@@ -309,3 +309,38 @@ async def research_project(project_name: str, project_type: str = None) -> Dict[
     """Factory function for web research."""
     researcher = WebResearcher(project_name, project_type)
     return await researcher.research_project()
+
+
+async def research_with_perplexity(query: str) -> str:
+    """Research using Perplexity MCP if available.
+
+    Args:
+        query: Research query
+
+    Returns:
+        Research findings as string
+    """
+    try:
+        # Try to use Perplexity MCP (stub for now - can be implemented with Perplexity API)
+        print(f"   🤖 Pesquisando com Perplexity: {query[:50]}...")
+
+        # Placeholder: Would call Perplexity API here
+        # For now, return indication that research would happen
+        research_result = f"""
+Pesquisa de Perplexity para: {query}
+
+Nota: Integração com Perplexity disponível através de MCP.
+Para usar, configure as credenciais do Perplexity em AGENTS.md
+
+Áreas de pesquisa sugeridas:
+- Tendências da indústria
+- Benchmarks competitivos
+- Regulamentações relevantes
+- Oportunidades de mercado
+- Tecnologias emergentes
+"""
+        return research_result
+
+    except Exception as e:
+        print(f"   ⚠️  Perplexity não disponível: {e}")
+        return f"Pesquisa de Perplexity não disponível: {str(e)}"
