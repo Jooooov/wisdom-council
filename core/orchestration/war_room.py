@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from core.llm import create_ram_manager, create_mlx_loader
 from core.research.manual_inputs import get_context_for_agent
 from core.research.context_enricher import ContextEnricher
+from core.memory.rag_memory import create_rag_memory
 
 
 class WarRoom:
@@ -31,6 +32,7 @@ class WarRoom:
         self.discussion_log = []
         self.agent_perspectives = {}
         self.manual_inputs_context = ""
+        self.memory = create_rag_memory()  # Initialize learning memory
 
     async def prepare(self) -> bool:
         """Prepare LLM and check RAM."""
@@ -158,15 +160,29 @@ class WarRoom:
         # Build context for the agent
         business_summary = self._build_business_summary_for_agent(agent)
 
+        # Get past experiences from memory for this agent role
+        past_experiences = ""
+        try:
+            relevant_memories = self.memory.retrieve(
+                f"{agent.role} analysis",
+                top_k=2
+            )
+            if relevant_memories:
+                past_experiences = "\n\n📚 EXPERIÊNCIAS PASSADAS:\n"
+                for memory in relevant_memories[:2]:
+                    past_experiences += f"- {memory.get('summary', memory.get('content', '')[:100])}\n"
+        except Exception as e:
+            pass  # Memory retrieval optional
+
         # Create personality-specific prompt
-        prompt = self._create_agent_prompt(agent, business_summary)
+        prompt = self._create_agent_prompt(agent, business_summary, past_experiences)
 
         # Get LLM reasoning
         try:
-            # Use higher max_tokens for deep reasoning with chain-of-thought
+            # Use very high max_tokens for complete untruncated reasoning
             reasoning = await self.llm_loader.generate(
                 prompt=prompt,
-                max_tokens=800  # Allow space for thinking + detailed analysis
+                max_tokens=3000  # Full reasoning without truncation
             )
 
             perspective = {
@@ -314,7 +330,7 @@ Ameaças: {', '.join(case.get('competitive_analysis', {}).get('threats', [])[:2]
 """
         return summary.strip()
 
-    def _create_agent_prompt(self, agent, business_summary: str) -> str:
+    def _create_agent_prompt(self, agent, business_summary: str, past_experiences: str = "") -> str:
         """Create personality-specific analysis prompt for agent."""
         # Include manual inputs context if available
         manual_context = ""
@@ -322,111 +338,61 @@ Ameaças: {', '.join(case.get('competitive_analysis', {}).get('threats', [])[:2]
             manual_context = f"\n{self.manual_inputs_context}\n"
 
         role_prompts = {
-            "analyst": f"""{manual_context}
-Você é {agent.name}, um analista perspicaz com excelente capacidade de ver padrões nos dados.
+            "analyst": f"""{manual_context}{past_experiences}
+{agent.name} analisa MÉTRICAS, DADOS e TENDÊNCIAS DE MERCADO.
 
-IMPORTANTE: Mostre seu raciocínio profundo passo-a-passo.
-
-Analise este caso de negócio focando em MÉTRICAS, DADOS e TENDÊNCIAS DE MERCADO:
+Caso de negócio:
 {business_summary}
 
-Forneça sua análise como {agent.name} faria:
-1. 🧠 RACIOCÍNIO: Primeiro, explique seu processo de pensamento
-2. 📊 ANÁLISE: Detalhe a interpretação dos dados
-3. 🎯 CONCLUSÃO: Síntese e recomendação
+Pensamento: Que dizem os números? É viável? Que pressupostos questionar? Que padrões encontra?""",
 
-Seja profundo, questione pressupostos, encontre padrões ocultos.
-O que os números te dizem? Isto é viável? Responda em português.""",
+            "architect": f"""{manual_context}{past_experiences}
+{agent.name} analisa ESTRUTURA, ESCALABILIDADE e VIABILIDADE arquitetônica.
 
-            "architect": f"""{manual_context}
-Você é {agent.name}, um arquiteto estratégico focado em estrutura e escalabilidade.
-
-IMPORTANTE: Mostre seu raciocínio profundo passo-a-passo.
-
-Analise este caso de negócio focando em ESTRUTURA, ESCALABILIDADE e VIABILIDADE:
+Caso de negócio:
 {business_summary}
 
-Forneça sua análise como {agent.name} faria:
-1. 🧠 RACIOCÍNIO: Seu processo de pensamento arquitetônico
-2. 🏗️  ANÁLISE: Avaliação de estrutura e escalabilidade
-3. 🎯 CONCLUSÃO: Pontos fracos fundamentais e viabilidade
+Pensamento: Como está estruturado? Pode escalar? Que fraquezas fundamentais existem?""",
 
-Como esse negócio está estruturado? Pode escalar? Responda em português.""",
+            "developer": f"""{manual_context}{past_experiences}
+{agent.name} avalia EXECUÇÃO, RECURSOS e VIABILIDADE TÉCNICA.
 
-            "developer": f"""{manual_context}
-Você é {agent.name}, um operador decisivo focado em EXECUÇÃO e VIABILIDADE TÉCNICA.
-
-IMPORTANTE: Mostre seu raciocínio profundo passo-a-passo.
-
-Analise este caso de negócio focando em EXECUÇÃO, RECURSOS e VIABILIDADE TÉCNICA:
+Caso de negócio:
 {business_summary}
 
-Forneça sua análise como {agent.name} faria:
-1. 🧠 RACIOCÍNIO: Seu processo de pensamento técnico
-2. ⚙️  ANÁLISE: Avaliação de execução e recursos
-3. 🎯 CONCLUSÃO: Riscos e viabilidade de implementação
+Pensamento: Pode ser construído? Temos recursos? Qual é o risco de implementação?""",
 
-Isso pode realmente ser construído? Temos recursos? Responda em português.""",
+            "researcher": f"""{manual_context}{past_experiences}
+{agent.name} explora MERCADO, COMPETIÇÃO e OPORTUNIDADES.
 
-            "researcher": f"""{manual_context}
-Você é {agent.name}, um pesquisador estratégico com profundo conhecimento de mercado.
-
-IMPORTANTE: Mostre seu raciocínio profundo passo-a-passo.
-
-Analise este caso de negócio focando em PROFUNDIDADE DE MERCADO, INTELIGÊNCIA COMPETITIVA e OPORTUNIDADES:
+Caso de negócio:
 {business_summary}
 
-Forneça sua análise como {agent.name} faria:
-1. 🧠 RACIOCÍNIO: Seu processo investigativo
-2. 🔍 ANÁLISE: Inteligência de mercado e competição
-3. 🎯 CONCLUSÃO: Oportunidades e lacunas identificadas
+Pensamento: Qual é a história profunda do mercado? Quem são os verdadeiros concorrentes? Que oportunidades estão ocultas?""",
 
-Qual é a história profunda do mercado? Quem são os concorrentes reais? Responda em português.""",
+            "writer": f"""{manual_context}{past_experiences}
+{agent.name} avalia POSICIONAMENTO, MENSAGEM e ENTRADA NO MERCADO.
 
-            "writer": f"""{manual_context}
-Você é {agent.name}, um comunicador estratégico focado em POSICIONAMENTO e ENTRADA NO MERCADO.
-
-IMPORTANTE: Mostre seu raciocínio profundo passo-a-passo.
-
-Analise este caso de negócio focando em POSICIONAMENTO, MENSAGEM e ENTRADA NO MERCADO:
+Caso de negócio:
 {business_summary}
 
-Forneça sua análise como {agent.name} faria:
-1. 🧠 RACIOCÍNIO: Seu processo de pensamento estratégico
-2. 💬 ANÁLISE: Posicionamento, narrativa e GTM
-3. 🎯 CONCLUSÃO: Estratégia de comunicação recomendada
+Pensamento: Como posicionamos? Qual é nossa história? Como ganhamos no mercado?""",
 
-Como posicionamos? Qual é nossa história? Responda em português.""",
+            "validator": f"""{manual_context}{past_experiences}
+{agent.name} questiona RISCOS, PRESSUPOSTOS e VALIDAÇÃO.
 
-            "validator": f"""{manual_context}
-Você é {agent.name}, um validador cuidadoso focado em RISCOS e PRESSUPOSTOS.
-
-IMPORTANTE: Mostre seu raciocínio profundo passo-a-passo.
-
-Analise este caso de negócio focando em RISCOS, PRESSUPOSTOS e VALIDAÇÃO:
+Caso de negócio:
 {business_summary}
 
-Forneça sua análise como {agent.name} faria:
-1. 🧠 RACIOCÍNIO: Seu processo crítico de pensamento
-2. ⚠️  ANÁLISE: Riscos, pressupostos e pontos fracos
-3. 🎯 CONCLUSÃO: O que precisa validação crítica
+Pensamento: O que poderia dar errado? Que pressupostos podem estar errados? O que precisa validação?""",
 
-O que poderia dar errado? O que estamos assumindo? Responda em português.""",
+            "coordinator": f"""{manual_context}{past_experiences}
+{agent.name} avalia como LÍDER ESTRATÉGICO a ESTRATÉGIA e ALINHAMENTO.
 
-            "coordinator": f"""{manual_context}
-Você é {agent.name}, um coordenador visionário focado em ESTRATÉGIA e ALINHAMENTO.
-
-IMPORTANTE: Mostre seu raciocínio profundo passo-a-passo.
-
-Analise este caso de negócio como um LÍDER ESTRATÉGICO:
+Caso de negócio:
 {business_summary}
 
-Forneça sua análise como {agent.name} faria:
-1. 🧠 RACIOCÍNIO: Seu processo estratégico de pensamento
-2. 🎯 ANÁLISE: Alinhamento, viabilidade estratégica e fit
-3. 🎯 CONCLUSÃO: Recomendação executiva final
-
-Isto está alinhado com nossa visão? Vale o tempo e recursos? Responda em português.""",
+Pensamento: Isto está alinhado com nossa visão? Vale nosso tempo e recursos?""",
         }
 
         # Match role to prompt

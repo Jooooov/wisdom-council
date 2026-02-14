@@ -139,23 +139,49 @@ class ContextEnricher:
             return self._generate_mock_research(query)
 
     def _generate_research_query(self) -> str:
-        """Generate intelligent research query from project context."""
-        project_type = self.enriched_context.get('project_type', '')
+        """Generate intelligent research query by analyzing actual project content."""
+        keywords = set()
+
+        # Extract keywords from contexto.md
+        contexto = self.enriched_context.get('key_files', {}).get('contexto', '')
+        if contexto:
+            # Extract meaningful keywords from contexto
+            lines = contexto.split('\n')
+            for line in lines:
+                line_lower = line.lower()
+                # Look for business type indicators
+                if 'company' in line_lower or 'empresa' in line_lower:
+                    words = [w.strip('.,;:').lower() for w in line.split()
+                            if len(w) > 3 and w.strip('.,;:').lower() not in ['the', 'and', 'that', 'this', 'with', 'from']]
+                    keywords.update(words[:5])
+                if 'type' in line_lower or 'tipo' in line_lower:
+                    words = [w.strip('.,;:').lower() for w in line.split()
+                            if len(w) > 4 and w.strip('.,;:').lower() not in ['the', 'type', 'tipo']]
+                    keywords.update(words[:3])
+
+        # Extract from project name and files
+        project_name = self.project_path.name.lower()
+        keywords.add(project_name)
+
+        # Look at file types to infer domain
         files = self.enriched_context.get('files_found', {})
+        if '.py' in files:
+            keywords.add('software development')
+        if '.md' in files:
+            keywords.add('documentation')
 
-        # Extract industry keywords
-        keywords = []
-        if 'electroplating' in project_type.lower():
-            keywords.append('electroplating industry Portugal')
-        if 'research' in project_type.lower():
-            keywords.append('research methodology best practices')
-        if 'scrapper' in str(self.project_path).lower():
-            keywords.append('web scraping industry trends')
+        # Filter out generic words and build query
+        filtered = [k for k in keywords if k and len(k) > 2 and k not in
+                   ['the', 'and', 'that', 'this', 'from', 'with', 'for', 'project', 'analysis']]
 
-        if keywords:
-            return f"Industry analysis: {keywords[0]}"
+        if filtered:
+            # Build natural language query
+            query_terms = filtered[:5]
+            query = f"Market analysis and industry trends for: {', '.join(query_terms)}"
         else:
-            return f"Project analysis for {self.project_path.name}"
+            query = f"Strategic analysis for {project_name}"
+
+        return query
 
     def _generate_mock_research(self, query: str) -> str:
         """Generate mock research when Perplexity unavailable."""
