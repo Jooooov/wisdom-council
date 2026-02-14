@@ -186,6 +186,10 @@ class WisdomCouncil:
         print("-" * 70)
         business_case = await analyze_business(str(project_path), project['title'])
 
+        # Add paths information for merged projects (for manual inputs search)
+        if project.get('paths'):
+            business_case['paths'] = project['paths']
+
         if business_case.get('status') == 'READY' and business_case.get('ready_for_agent_discussion'):
             # It's a business project - use War Room with LLM
             print("\n⚔️  Step 4/4: War Room Discussion with LLM Reasoning")

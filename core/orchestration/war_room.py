@@ -41,7 +41,15 @@ class WarRoom:
         if self.project_path:
             print("\n📂 Lendo inputs manuais do projeto...")
             try:
-                self.manual_inputs_context = get_context_for_agent(self.project_path)
+                # Extract additional paths from business case if it's a merged project
+                additional_paths = []
+                if isinstance(self.business_case, dict) and self.business_case.get('paths'):
+                    # Get the Obsidian path if this is a merged project
+                    obsidian_path = self.business_case['paths'].get('obsidian')
+                    if obsidian_path and obsidian_path != self.project_path:
+                        additional_paths.append(obsidian_path)
+
+                self.manual_inputs_context = get_context_for_agent(self.project_path, additional_paths)
                 if self.manual_inputs_context:
                     print("   ✅ Inputs críticos do utilizador carregados")
             except Exception as e:

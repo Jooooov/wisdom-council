@@ -12,9 +12,16 @@ from typing import Dict, List, Any
 class ManualInputsReader:
     """Reads and incorporates manual inputs from project directories."""
 
-    def __init__(self, project_path: str):
-        """Initialize reader."""
+    def __init__(self, project_path: str, additional_paths: list = None):
+        """Initialize reader.
+
+        Args:
+            project_path: Primary project path (usually Apps path)
+            additional_paths: List of additional paths to search (e.g., Obsidian path for merged projects)
+        """
         self.project_path = Path(project_path)
+        self.additional_paths = [Path(p) for p in (additional_paths or [])]
+        self.all_paths = [self.project_path] + self.additional_paths
         self.inputs = {
             "raw_files": [],
             "context": "",
@@ -25,7 +32,7 @@ class ManualInputsReader:
         }
 
     def read_inputs(self) -> Dict[str, Any]:
-        """Read all manual inputs from project."""
+        """Read all manual inputs from project (searches multiple paths)."""
         print("\n🔍 Buscando manual inputs (contexto crítico)...")
 
         # Try different folder names
@@ -40,17 +47,29 @@ class ManualInputsReader:
         ]
 
         inputs_folder = None
-        for name in possible_names:
-            candidate = self.project_path / name
-            if candidate.exists() and candidate.is_dir():
-                inputs_folder = candidate
+        found_in_path = None
+
+        # Search in all provided paths
+        for project_path in self.all_paths:
+            if not project_path.exists():
+                continue
+
+            for name in possible_names:
+                candidate = project_path / name
+                if candidate.exists() and candidate.is_dir():
+                    inputs_folder = candidate
+                    found_in_path = project_path
+                    break
+
+            if inputs_folder:
                 break
 
         if not inputs_folder:
             print("   ℹ️  Nenhuma pasta de manual inputs encontrada")
             return self.inputs
 
-        print(f"   ✅ Pasta encontrada: {inputs_folder.name}")
+        relative_path = "Apps" if found_in_path == self.project_path else "Obsidian"
+        print(f"   ✅ Pasta encontrada ({relative_path}): {inputs_folder.name}")
 
         # Read all files in the folder
         self._read_folder_contents(inputs_folder)
@@ -155,14 +174,24 @@ class ManualInputsReader:
         return summary
 
 
-def read_manual_inputs(project_path: str) -> Dict[str, Any]:
-    """Factory function to read manual inputs."""
-    reader = ManualInputsReader(project_path)
+def read_manual_inputs(project_path: str, additional_paths: list = None) -> Dict[str, Any]:
+    """Factory function to read manual inputs.
+
+    Args:
+        project_path: Primary project path
+        additional_paths: Additional paths to search (e.g., Obsidian path for merged projects)
+    """
+    reader = ManualInputsReader(project_path, additional_paths)
     return reader.read_inputs()
 
 
-def get_context_for_agent(project_path: str) -> str:
-    """Get formatted context from manual inputs."""
-    reader = ManualInputsReader(project_path)
+def get_context_for_agent(project_path: str, additional_paths: list = None) -> str:
+    """Get formatted context from manual inputs.
+
+    Args:
+        project_path: Primary project path
+        additional_paths: Additional paths to search (e.g., Obsidian path for merged projects)
+    """
+    reader = ManualInputsReader(project_path, additional_paths)
     reader.read_inputs()
     return reader.get_context_for_agent()
