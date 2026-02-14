@@ -2,6 +2,9 @@
 
 # The Wisdom Council - Double-Click Startup (macOS)
 
+# CRITICAL: Fix OpenMP duplicate library error (macOS)
+export KMP_DUPLICATE_LIB_OK=TRUE
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR"
 
