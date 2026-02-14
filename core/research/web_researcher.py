@@ -324,18 +324,37 @@ async def research_with_perplexity(query: str, api_key: str = None) -> str:
     try:
         import os
         import httpx
+        from pathlib import Path
+
+        # Load .env file if exists
+        if not api_key:
+            env_file = Path.cwd() / ".env"
+            if not env_file.exists():
+                # Try parent directories
+                env_file = Path.home() / "Desktop/Apps/His Dark Materials/.env"
+
+            if env_file.exists():
+                try:
+                    with open(env_file) as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith("#"):
+                                key, value = line.split("=", 1)
+                                os.environ[key.strip()] = value.strip()
+                except Exception:
+                    pass
 
         # Get API key
         if not api_key:
             api_key = os.getenv('PERPLEXITY_API_KEY')
 
         if not api_key:
-            raise ValueError("PERPLEXITY_API_KEY not found")
+            raise ValueError("PERPLEXITY_API_KEY não encontrada. Configure em .env ou passe como parâmetro.")
 
         print(f"   🤖 Pesquisando com Perplexity: {query[:50]}...")
 
         # Call Perplexity API
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 "https://api.perplexity.ai/chat/completions",
                 headers={
@@ -369,10 +388,12 @@ async def research_with_perplexity(query: str, api_key: str = None) -> str:
             print(f"   ⚠️  Resposta inesperada do Perplexity")
             return f"Pesquisa não retornou resultado esperado"
 
-    except ImportError:
-        print(f"   ⚠️  httpx não instalado. Execute: pip install httpx")
-        return "httpx não instalado"
+    except ImportError as e:
+        print(f"   ⚠️  Erro de importação: {e}")
+        return "Dependência não instalada"
 
     except Exception as e:
-        print(f"   ⚠️  Erro ao pesquisar com Perplexity: {e}")
+        import traceback
+        print(f"   ⚠️  Erro ao pesquisar com Perplexity: {str(e)}")
+        traceback.print_exc()
         return f"Erro na pesquisa: {str(e)}"

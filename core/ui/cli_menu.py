@@ -108,11 +108,19 @@ class CLIMenu:
         try:
             import asyncio
             import os
+            from pathlib import Path
             from core.research.context_enricher import ContextEnricher
+
+            # Find corresponding Obsidian project folder
+            obsidian_path = self._find_obsidian_project(project['title'])
+            if obsidian_path:
+                print(f"\n📚 Encontrado projeto Obsidian: {obsidian_path}")
+            else:
+                print(f"\n⚠️  Nenhum projeto Obsidian encontrado para {project['title']}")
 
             # Analyze files
             print("\n📁 Analisando ficheiros do projeto...")
-            enricher = ContextEnricher(project['path'])
+            enricher = ContextEnricher(project['path'], obsidian_path)
             enricher.analyze_project_files()
 
             # Enrich with Perplexity
@@ -143,7 +151,37 @@ class CLIMenu:
 
         except Exception as e:
             print(f"\n❌ Erro ao enriquecer: {e}")
+            import traceback
+            traceback.print_exc()
             input("\nPress ENTER to continue...")
+
+    def _find_obsidian_project(self, project_name: str):
+        """Find corresponding Obsidian project folder by name.
+
+        Args:
+            project_name: Name of the project (e.g., 'Chemetil')
+
+        Returns:
+            Path to Obsidian project folder or None
+        """
+        try:
+            obsidian_base = Path.home() / "ObsidianVault"
+            if not obsidian_base.exists():
+                return None
+
+            # Try exact match first
+            project_folder = obsidian_base / project_name
+            if project_folder.exists() and project_folder.is_dir():
+                return project_folder
+
+            # Try case-insensitive match
+            for folder in obsidian_base.iterdir():
+                if folder.is_dir() and folder.name.lower() == project_name.lower():
+                    return folder
+
+            return None
+        except Exception as e:
+            return None
 
     def _show_war_room_menu(self):
         """Show War Room menu."""

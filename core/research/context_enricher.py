@@ -14,12 +14,20 @@ import json
 class ContextEnricher:
     """Enriches project context by analyzing files and researching industry."""
 
-    def __init__(self, project_path: str):
-        """Initialize enricher."""
+    def __init__(self, project_path: str, obsidian_path: str = None):
+        """Initialize enricher.
+
+        Args:
+            project_path: Path to project in Apps folder
+            obsidian_path: Path to corresponding Obsidian project folder (optional)
+        """
         self.project_path = Path(project_path)
+        self.obsidian_path = Path(obsidian_path) if obsidian_path else None
         self.enriched_context = {
             "files_found": [],
+            "obsidian_files": [],
             "key_files": {},
+            "obsidian_content": {},
             "project_type": "",
             "industry": "",
             "web_research": "",
@@ -32,57 +40,100 @@ class ContextEnricher:
 
         if not self.project_path.exists():
             print(f"   ⚠️  Caminho não existe: {self.project_path}")
-            return self.enriched_context
+        else:
+            # Scan for important files in Apps folder
+            important_extensions = ['.md', '.txt', '.py', '.json', '.yaml', '.yml']
+            important_names = [
+                'README', 'contexto', 'estrutura', 'config', 'setup',
+                'requirements', 'package.json', 'dockerfile', '.env'
+            ]
 
-        # Scan for important files
-        important_extensions = ['.md', '.txt', '.py', '.json', '.yaml', '.yml']
-        important_names = [
-            'README', 'contexto', 'estrutura', 'config', 'setup',
-            'requirements', 'package.json', 'dockerfile', '.env'
-        ]
+            files_by_type = {}
+            total_size = 0
 
-        files_by_type = {}
-        total_size = 0
+            for file_path in self.project_path.rglob('*'):
+                if not file_path.is_file():
+                    continue
 
-        for file_path in self.project_path.rglob('*'):
-            if not file_path.is_file():
-                continue
+                # Skip hidden/cache dirs
+                if any(part.startswith('.') for part in file_path.parts):
+                    continue
+                if '__pycache__' in str(file_path):
+                    continue
 
-            # Skip hidden/cache dirs
-            if any(part.startswith('.') for part in file_path.parts):
-                continue
-            if '__pycache__' in str(file_path):
-                continue
+                # Categorize files
+                ext = file_path.suffix.lower()
+                name = file_path.name.lower()
 
-            # Categorize files
-            ext = file_path.suffix.lower()
-            name = file_path.name.lower()
+                if ext in important_extensions or any(imp in name for imp in important_names):
+                    file_type = ext or 'other'
+                    if file_type not in files_by_type:
+                        files_by_type[file_type] = []
 
-            if ext in important_extensions or any(imp in name for imp in important_names):
-                file_type = ext or 'other'
-                if file_type not in files_by_type:
-                    files_by_type[file_type] = []
+                    try:
+                        size = file_path.stat().st_size
+                        total_size += size
+                        files_by_type[file_type].append({
+                            'name': file_path.name,
+                            'path': str(file_path.relative_to(self.project_path)),
+                            'size': size
+                        })
+                    except Exception as e:
+                        pass
 
-                try:
-                    size = file_path.stat().st_size
-                    total_size += size
-                    files_by_type[file_type].append({
-                        'name': file_path.name,
-                        'path': str(file_path.relative_to(self.project_path)),
-                        'size': size
-                    })
-                except Exception as e:
-                    pass
+            # Store findings
+            self.enriched_context['files_found'] = files_by_type
+            print(f"   ✅ Encontrados {sum(len(f) for f in files_by_type.values())} ficheiros importantes (Apps)")
+            print(f"   ✅ Tamanho total: {total_size / 1024:.1f} KB")
 
-        # Store findings
-        self.enriched_context['files_found'] = files_by_type
-        print(f"   ✅ Encontrados {sum(len(f) for f in files_by_type.values())} ficheiros importantes")
-        print(f"   ✅ Tamanho total: {total_size / 1024:.1f} KB")
+        # Read Obsidian project files if available
+        if self.obsidian_path:
+            self._read_obsidian_files()
 
         # Analyze key files for context
         self._extract_key_information()
 
         return self.enriched_context
+
+    def _read_obsidian_files(self) -> None:
+        """Read all markdown files from Obsidian project folder."""
+        if not self.obsidian_path or not self.obsidian_path.exists():
+            return
+
+        print(f"\n📚 Lendo ficheiros do Obsidian ({self.obsidian_path.name})...")
+
+        obsidian_files = []
+        total_chars = 0
+
+        for file_path in self.obsidian_path.glob('*.md'):
+            if not file_path.is_file():
+                continue
+
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                obsidian_files.append({
+                    'name': file_path.name,
+                    'size': len(content)
+                })
+
+                # Store content with attribution
+                source_key = f"obsidian_{file_path.stem}"
+                self.enriched_context['obsidian_content'][source_key] = {
+                    'filename': file_path.name,
+                    'content': content
+                }
+
+                total_chars += len(content)
+
+            except Exception as e:
+                print(f"   ⚠️  Erro ao ler {file_path.name}: {e}")
+
+        self.enriched_context['obsidian_files'] = obsidian_files
+        if obsidian_files:
+            print(f"   ✅ Lidos {len(obsidian_files)} ficheiros do Obsidian")
+            print(f"   ✅ Total: {total_chars:,} caracteres")
 
     def _extract_key_information(self):
         """Extract key information from important files."""
@@ -202,19 +253,32 @@ Recomendações gerais:
         """Get formatted enriched context for agents."""
         context = """
 === CONTEXTO ENRIQUECIDO DO PROJETO ===
-(Análise de ficheiros + Pesquisa de indústria)
+(Análise de ficheiros + Obsidian + Pesquisa de indústria)
 
 """
         # Add files analysis
         if self.enriched_context['files_found']:
-            context += "📁 FICHEIROS DO PROJETO:\n"
+            context += "📁 FICHEIROS DO PROJETO (Apps):\n"
             for file_type, files in self.enriched_context['files_found'].items():
                 context += f"  • {file_type}: {len(files)} ficheiro(s)\n"
                 for f in files[:3]:  # Show first 3 of each type
                     context += f"    - {f['name']}\n"
             context += "\n"
 
-        # Add key information
+        # Add Obsidian content
+        if self.enriched_context['obsidian_content']:
+            context += "📚 FICHEIROS DO OBSIDIAN (Contexto Estratégico):\n"
+            for key, file_info in self.enriched_context['obsidian_content'].items():
+                context += f"\n  📄 {file_info['filename']}:\n"
+                # Limit to first 1000 chars to avoid too much context
+                content_preview = file_info['content'][:1500]
+                for line in content_preview.split('\n'):
+                    context += f"    {line}\n"
+                if len(file_info['content']) > 1500:
+                    context += "    ... (conteúdo truncado)\n"
+            context += "\n"
+
+        # Add key information from contexto.md in Apps
         if self.enriched_context['key_files']:
             context += "🔑 INFORMAÇÃO-CHAVE:\n"
             if 'contexto' in self.enriched_context['key_files']:
@@ -223,22 +287,23 @@ Recomendações gerais:
 
         # Add web research
         if self.enriched_context['web_research']:
-            context += "🌐 PESQUISA DE INDÚSTRIA:\n"
+            context += "🌐 PESQUISA DE INDÚSTRIA (Perplexity):\n"
             context += self.enriched_context['web_research'] + "\n"
 
         self.enriched_context['combined_context'] = context
         return context
 
 
-async def enrich_context(project_path: str, research_query: str = None, api_key: str = None) -> str:
+async def enrich_context(project_path: str, obsidian_path: str = None, research_query: str = None, api_key: str = None) -> str:
     """Factory function to enrich project context.
 
     Args:
-        project_path: Path to project
+        project_path: Path to project in Apps folder
+        obsidian_path: Path to corresponding Obsidian project folder (optional)
         research_query: Optional custom research query
         api_key: Perplexity API key (if None, uses environment)
     """
-    enricher = ContextEnricher(project_path)
+    enricher = ContextEnricher(project_path, obsidian_path)
 
     # Analyze files
     enricher.analyze_project_files()
