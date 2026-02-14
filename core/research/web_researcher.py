@@ -311,36 +311,68 @@ async def research_project(project_name: str, project_type: str = None) -> Dict[
     return await researcher.research_project()
 
 
-async def research_with_perplexity(query: str) -> str:
-    """Research using Perplexity MCP if available.
+async def research_with_perplexity(query: str, api_key: str = None) -> str:
+    """Research using Perplexity API.
 
     Args:
         query: Research query
+        api_key: Perplexity API key (if None, tries environment)
 
     Returns:
         Research findings as string
     """
     try:
-        # Try to use Perplexity MCP (stub for now - can be implemented with Perplexity API)
+        import os
+        import httpx
+
+        # Get API key
+        if not api_key:
+            api_key = os.getenv('PERPLEXITY_API_KEY')
+
+        if not api_key:
+            raise ValueError("PERPLEXITY_API_KEY not found")
+
         print(f"   🤖 Pesquisando com Perplexity: {query[:50]}...")
 
-        # Placeholder: Would call Perplexity API here
-        # For now, return indication that research would happen
-        research_result = f"""
-Pesquisa de Perplexity para: {query}
+        # Call Perplexity API
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "sonar",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a research assistant. Provide detailed, factual research findings in Portuguese (português). Focus on: industry trends, competitive landscape, market opportunities, and key insights."
+                        },
+                        {
+                            "role": "user",
+                            "content": query
+                        }
+                    ],
+                    "max_tokens": 1500,
+                    "temperature": 0.7
+                }
+            )
 
-Nota: Integração com Perplexity disponível através de MCP.
-Para usar, configure as credenciais do Perplexity em AGENTS.md
+        result = response.json()
 
-Áreas de pesquisa sugeridas:
-- Tendências da indústria
-- Benchmarks competitivos
-- Regulamentações relevantes
-- Oportunidades de mercado
-- Tecnologias emergentes
-"""
-        return research_result
+        if "choices" in result and len(result["choices"]) > 0:
+            research_text = result["choices"][0]["message"]["content"]
+            print(f"   ✅ Pesquisa concluída ({len(research_text)} caracteres)")
+            return research_text
+        else:
+            print(f"   ⚠️  Resposta inesperada do Perplexity")
+            return f"Pesquisa não retornou resultado esperado"
+
+    except ImportError:
+        print(f"   ⚠️  httpx não instalado. Execute: pip install httpx")
+        return "httpx não instalado"
 
     except Exception as e:
-        print(f"   ⚠️  Perplexity não disponível: {e}")
-        return f"Pesquisa de Perplexity não disponível: {str(e)}"
+        print(f"   ⚠️  Erro ao pesquisar com Perplexity: {e}")
+        return f"Erro na pesquisa: {str(e)}"

@@ -117,7 +117,7 @@ class ContextEnricher:
 
         print("   ✅ Informação extraída")
 
-    async def enrich_with_web_research(self, query: str = None) -> str:
+    async def enrich_with_web_research(self, query: str = None, api_key: str = None) -> str:
         """Use Perplexity to research industry/business type."""
         if not query:
             query = self._generate_research_query()
@@ -125,10 +125,10 @@ class ContextEnricher:
         print(f"\n🌐 Pesquisando no Perplexity: {query[:60]}...")
 
         try:
-            # Try to use Perplexity MCP if available
+            # Try to use Perplexity API
             from core.research.web_researcher import research_with_perplexity
 
-            research = await research_with_perplexity(query)
+            research = await research_with_perplexity(query, api_key)
             self.enriched_context['web_research'] = research
             print("   ✅ Pesquisa concluída")
             return research
@@ -204,12 +204,13 @@ Recomendações gerais:
         return context
 
 
-async def enrich_context(project_path: str, research_query: str = None) -> str:
+async def enrich_context(project_path: str, research_query: str = None, api_key: str = None) -> str:
     """Factory function to enrich project context.
 
     Args:
         project_path: Path to project
         research_query: Optional custom research query
+        api_key: Perplexity API key (if None, uses environment)
     """
     enricher = ContextEnricher(project_path)
 
@@ -218,10 +219,10 @@ async def enrich_context(project_path: str, research_query: str = None) -> str:
 
     # Enrich with web research
     if research_query:
-        await enricher.enrich_with_web_research(research_query)
+        await enricher.enrich_with_web_research(research_query, api_key)
     else:
         # Auto-generate research query
         query = enricher._generate_research_query()
-        await enricher.enrich_with_web_research(query)
+        await enricher.enrich_with_web_research(query, api_key)
 
     return enricher.get_enriched_context()
