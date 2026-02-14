@@ -115,6 +115,7 @@ class ProjectFinder:
             "title": title,
             "description": description,
             "source": "MERGED",  # Novo tipo: merged
+            "path": apps['path'],  # Usar path do Apps como principal
             "paths": {
                 "obsidian": obsidian['path'],
                 "apps": apps['path']
