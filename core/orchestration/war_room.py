@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from core.llm import create_ram_manager, create_mlx_loader
 from core.research.manual_inputs import get_context_for_agent
 from core.research.context_enricher import ContextEnricher
-from core.memory.rag_memory import create_rag_memory
+from core.memory.hybrid_memory import create_hybrid_memory
 
 
 class WarRoom:
@@ -32,7 +32,7 @@ class WarRoom:
         self.discussion_log = []
         self.agent_perspectives = {}
         self.manual_inputs_context = ""
-        self.memory = create_rag_memory()  # Initialize learning memory
+        self.hybrid_memory = create_hybrid_memory()  # RAG + Graph learning
 
     async def prepare(self) -> bool:
         """Prepare LLM and check RAM."""
@@ -141,13 +141,28 @@ class WarRoom:
 
             recommendation = await self._generate_final_recommendation()
 
-            return {
+            result = {
                 "perspectives": self.agent_perspectives,
                 "discussion": discussion,
                 "consensus": consensus,
                 "recommendation": recommendation,
                 "status": "COMPLETE"
             }
+
+            # Store in hybrid memory for learning
+            try:
+                self.hybrid_memory.store_analysis({
+                    "project_name": self.business_case.get('project_name'),
+                    "project_type": self.business_case.get('project_type'),
+                    "summary": str(result)[:500],
+                    "perspectives": self.agent_perspectives,
+                    "conclusion": recommendation.get('decision', '')
+                })
+                print("\n📚 Análise armazenada em memória de aprendizado")
+            except Exception as e:
+                print(f"   ⚠️  Erro ao guardar em memória: {e}")
+
+            return result
 
         except Exception as e:
             print(f"\n❌ Discussão da Sala de Guerra falhou: {e}")
@@ -160,17 +175,35 @@ class WarRoom:
         # Build context for the agent
         business_summary = self._build_business_summary_for_agent(agent)
 
-        # Get past experiences from memory for this agent role
+        # Get past experiences from hybrid memory (RAG + Graph)
         past_experiences = ""
         try:
-            relevant_memories = self.memory.retrieve(
-                f"{agent.role} analysis",
+            # Retrieve similar analyses by agent role
+            similar = self.hybrid_memory.retrieve_similar_analyses(
+                f"{agent.role} {self.business_case.get('project_type', '')}",
                 top_k=2
             )
-            if relevant_memories:
-                past_experiences = "\n\n📚 EXPERIÊNCIAS PASSADAS:\n"
-                for memory in relevant_memories[:2]:
-                    past_experiences += f"- {memory.get('summary', memory.get('content', '')[:100])}\n"
+
+            # Retrieve pattern insights for this project type
+            patterns = self.hybrid_memory.retrieve_pattern_insights(
+                self.business_case.get('project_type', '')
+            )
+
+            if similar or patterns:
+                past_experiences = "\n\n📚 EXPERIÊNCIAS PASSADAS (Memória Aprendida):\n"
+
+                if similar:
+                    past_experiences += "Análises similares:\n"
+                    for mem in similar:
+                        past_experiences += f"- {mem.get('project', 'Projeto anterior')}: {mem.get('conclusion', '')[:80]}...\n"
+
+                if patterns:
+                    past_experiences += f"Padrões para {self.business_case.get('project_type')}:\n"
+                    if patterns.get('common_risks'):
+                        past_experiences += f"- Riscos comuns: {', '.join(patterns['common_risks'][:2])}\n"
+                    if patterns.get('common_opportunities'):
+                        past_experiences += f"- Oportunidades: {', '.join(patterns['common_opportunities'][:2])}\n"
+
         except Exception as e:
             pass  # Memory retrieval optional
 
