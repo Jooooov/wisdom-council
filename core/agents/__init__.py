@@ -1,5 +1,6 @@
 """
-The Wisdom Council - 7 Agents from His Dark Materials
+The Wisdom Council - 8 Agents from His Dark Materials
+7 Core Agents + Mary Malone (Tools Manager & Context Keeper)
 Each with unique daemon and specialized skills
 """
 
@@ -63,7 +64,7 @@ class Agent:
         }
 
 
-# The 7 Core Agents - Characters from His Dark Materials
+# The 8 Core Agents - Characters from His Dark Materials
 CORE_AGENTS = [
     Agent(
         id="analyst",
@@ -134,6 +135,16 @@ CORE_AGENTS = [
         description="Coordinates grand strategy, commands loyalty, drives ambitious vision forward",
         skills=["coordination", "leadership", "strategy", "vision", "command"],
         personality_traits=["ambitious", "strategic", "powerful", "charismatic"],
+    ),
+    Agent(
+        id="tools_manager",
+        name="Mary",
+        character="Mary Malone - Scientist, observer, bridge between worlds, keeper of knowledge",
+        role="Tools Manager",
+        daemon="Concept of Dust (represents interconnected knowledge and understanding)",
+        description="Discovers tools, documents them deeply, maintains agent context and knowledge synthesis",
+        skills=["tool_discovery", "scientific_analysis", "knowledge_synthesis", "context_management", "documentation"],
+        personality_traits=["observant", "curious", "scientific", "communicative", "connective"],
     ),
 ]
 

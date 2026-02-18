@@ -53,8 +53,12 @@ from core.tasks import TaskManager, Task, TaskStatus
 from core.memory import Memory
 from core.INTEGRATION.file_sync import get_project_finder
 from core.content import ContentReader
+from core.research.mary_context import get_mary_context, get_mary_research_system_prompt
+from core.research.mary_research_manager import get_mary_research_manager
+from core.obsidian import sync_mary_to_obsidian
 import asyncio
 import httpx
+from pathlib import Path
 
 
 class WisdomCouncil:
@@ -67,6 +71,11 @@ class WisdomCouncil:
         self.project_finder = get_project_finder()
         self.current_project = None
         self.llm_loaded = False
+
+        # Mary Malone's systems
+        self.mary_context = get_mary_context()
+        self.mary_manager = get_mary_research_manager()
+        self.agents_md_path = Path(__file__).parent / "agents.md"
 
     def print_header(self):
         """Print welcome header."""
@@ -520,6 +529,152 @@ Threats: {', '.join(business.get('competitive_analysis', {}).get('threats', [])[
                 return result if "error" not in result else None
         except:
             return None
+
+    # ===== Mary Malone's Research Methods =====
+
+    def mary_research(self, query: str, category: str = None):
+        """Mary conducts tool research."""
+        print("\n" + "=" * 70)
+        print("🔬 MARY MALONE - TOOL RESEARCH SESSION")
+        print("=" * 70)
+        print(f"\n📊 Mary's Research Context:")
+        print(f"   📅 Date: {self.mary_context.month_year}")
+        print(f"   🔍 Query: {query}")
+        if category:
+            print(f"   📁 Category: {category}")
+
+        # Start research session
+        session = self.mary_manager.start_research_session(query, "Mary")
+
+        print(f"\n{self.mary_context.get_search_guidelines()}")
+        print("\n" + "-" * 70)
+        print("✨ Mary's research session started.")
+        print("   When you find tools, Mary will document them.")
+        print(f"   Session ID: {session['id']}")
+        print("-" * 70 + "\n")
+
+        return session
+
+    def mary_show_context(self):
+        """Show Mary's research context."""
+        print("\n" + "=" * 70)
+        print("🔬 MARY MALONE'S CURRENT RESEARCH CONTEXT")
+        print("=" * 70)
+        print(f"\n📅 Current Date: {self.mary_context.month_year}")
+        print(f"   ISO: {self.mary_context.short_date}")
+
+        print(f"\n📊 Technology Versions Mary Tracks:")
+        for tech, version in self.mary_context.tech_versions.items():
+            print(f"   • {tech}: {version}")
+
+        print(f"\n🎯 Mary's Search Guidelines:")
+        print(self.mary_context.get_search_guidelines())
+
+        print(f"\n📚 Tools Discovered: {len(self.mary_manager.tools_db)}")
+        if self.mary_manager.tools_db:
+            for tool in self.mary_manager.tools_db[:5]:
+                print(f"   • {tool['name']} ({tool['category']})")
+
+        print()
+
+    def mary_update_agents_md(self):
+        """Mary updates the agents.md file."""
+        print("\n" + "=" * 70)
+        print("📝 MARY UPDATING agents.md")
+        print("=" * 70)
+
+        agents_md_content = self.mary_manager.create_agents_md(self.agents)
+
+        try:
+            self.agents_md_path.write_text(agents_md_content)
+            print(f"\n✅ agents.md updated successfully!")
+            print(f"   📁 Location: {self.agents_md_path}")
+            print(f"   📊 Agents documented: {len(self.agents)}")
+            print(f"   🔧 Tools tracked: {len(self.mary_manager.tools_db)}")
+            print("\n📌 Key Updates:")
+            print("   • Current date & time context")
+            print("   • Technology version baselines")
+            print("   • Mary's search guidelines")
+            print("   • All discovered tools")
+        except Exception as e:
+            print(f"\n❌ Error updating agents.md: {e}")
+
+        print()
+
+    def mary_sync_obsidian(self):
+        """Mary syncs tool database to Obsidian vault."""
+        print("\n" + "=" * 70)
+        print("🔗 MARY SYNCING TO OBSIDIAN VAULT")
+        print("=" * 70)
+
+        try:
+            obsidian = sync_mary_to_obsidian(self.mary_manager)
+            print(f"\n✅ Obsidian sync complete!")
+            print(f"   📁 Vault: source mindpalace")
+            print(f"   📂 Tools folder: 0 - tools")
+            print(f"   📊 Files created:")
+            print(f"      • _Index.md (main tools index)")
+            print(f"      • by_category/ folder (tools by category)")
+            print(f"      • by_agent/ folder (tools by agent)")
+            print(f"      • Emerging Tools Tracker.md")
+            print(f"\n🔗 Links created:")
+            print(f"   • [[Category]] links for browsing")
+            print(f"   • [[Agent's Tools]] links for each agent")
+            print(f"   • Backlinks between tools and agents")
+            print(f"\n📚 Tools synced: {len(self.mary_manager.tools_db)}")
+        except Exception as e:
+            print(f"\n❌ Error syncing Obsidian: {e}")
+            import traceback
+            traceback.print_exc()
+
+        print()
+
+    def mary_add_tool(self, name: str, category: str, summary: str,
+                     relevant_agents: list, source: str = ""):
+        """Mary documents a discovered tool."""
+        tool = self.mary_manager.add_tool_discovery(
+            name, category, summary, relevant_agents, source
+        )
+        print(f"\n✅ Mary documented: {name}")
+        print(f"   📁 Category: {category}")
+        print(f"   👥 For agents: {', '.join(relevant_agents)}")
+        print(f"   📍 Source: {source if source else 'Unknown'}")
+        return tool
+
+    def mary_show_tools(self):
+        """Show all tools Mary has discovered."""
+        print("\n" + "=" * 70)
+        print("🔧 MARY'S TOOL DATABASE")
+        print("=" * 70)
+
+        if not self.mary_manager.tools_db:
+            print("\n No tools discovered yet.")
+            print(" Mary is actively researching...\n")
+            return
+
+        print(f"\n📊 Total Tools: {len(self.mary_manager.tools_db)}\n")
+
+        # Group by category
+        by_category = {}
+        for tool in self.mary_manager.tools_db:
+            cat = tool['category']
+            if cat not in by_category:
+                by_category[cat] = []
+            by_category[cat].append(tool)
+
+        for category, tools in sorted(by_category.items()):
+            print(f"\n📁 {category.upper()} ({len(tools)})")
+            print("   " + "-" * 65)
+            for tool in tools:
+                agents = ", ".join(tool['relevant_agents'])
+                print(f"   • {tool['name']}")
+                print(f"     📝 {tool['summary']}")
+                print(f"     👥 For: {agents}")
+                if tool.get('source_url'):
+                    print(f"     🔗 {tool['source_url']}")
+                print()
+
+        print()
 
     def interactive_menu(self):
         """Run interactive menu."""
