@@ -1,1 +1,23 @@
+# Environment & secrets
 .env
+*.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+
+# Logs
+*.log
+logs/
+
+# Model cache (downloaded automatically, no need to commit)
+mlx-models/
+
+# Runtime state (large, auto-regenerated)
+# outputs/ intentionally NOT ignored — analysis results are worth keeping

@@ -1,0 +1,57 @@
+# Advanced Reasoning System — Configuration
+# His Dark Materials Wisdom Council v3
+# ----------------------------------------
+# Edit this file to tune MCTS depth, agent token budgets, and RAM thresholds.
+# The main code reads MCTSTree class attributes directly; this file documents
+# the intended defaults and serves as a quick-reference for tuning.
+
+model:
+  id: "mlx-community/Qwen3-4B-MLX-4bit"
+  framework: "mlx"            # Apple Silicon optimised
+  # First run: ~2.3 GB download from HuggingFace, cached locally after that
+  estimated_vram_gb: 2.3
+  # Max output tokens per agent call (keep < 1500 for 4B model)
+  lyra_max_tokens:    1200    # 4 branches + reasoning summary
+  will_max_tokens:    800     # Feasibility + blockers
+  coulter_max_tokens: 800     # Risk analysis + mitigations
+  iorek_max_tokens:   1000    # Financial model + scenarios
+  meta_max_tokens:    700     # Final synthesis + next steps
+
+mcts:
+  max_depth:        3         # Tree levels (root = 0; real reasoning at 1-3)
+  branches_per_node: 4        # Lyra generates this many branches per node
+  top_k_expand:     2         # Only expand the top-k branches (prune rest)
+  # Total LLM calls (worst case):
+  #   Level 1: 4 nodes × 3 agents = 12 calls + 1 Lyra
+  #   Level 2: 2 × 4 nodes × 3 agents = 24 calls + 2 Lyra
+  #   Level 3: 2 × 1 × 4 × 3 = 24 calls + 2 Lyra
+  #   Meta-Daemon: 1 call
+  #   TOTAL ≈ 66 LLM calls — expect 30-60 min on M4 Air
+
+memory:
+  state_dir: "~/.mcts_reasoning"     # Tree + explored paths saved here
+  min_confidence_for_retrieval: 0.65 # Filter low-quality past analyses
+  max_retrieved_paths: 3             # How many past analyses to inject
+
+ram:
+  qwen3_min_free_gb:   3.5    # Minimum free RAM to load model
+  qwen3_ideal_free_gb: 5.5    # Ideal free RAM for smooth operation
+  generation_min_gb:   2.0    # Minimum free RAM during each generate() call
+  # Qwen3-4B-4bit peak usage estimate:
+  #   Model weights:   ~2.3 GB
+  #   KV-cache:        ~0.5 GB
+  #   OS + overhead:   ~1.0 GB
+  #   Total peak:      ~3.8 GB
+  # On 16 GB M4 Air: leaves ~12 GB free for OS + other apps.
+
+output:
+  default_path: "outputs/mcts_analysis_result.json"
+  # The full tree JSON includes: business_idea, generated_at, mcts_config,
+  # confidence, best_path, financial_projection, key_risks, meta_daemon, full_tree
+
+# Notes on tuning for faster runs:
+#   - Reduce max_depth to 2 → ~30 LLM calls, ~15-25 min
+#   - Reduce branches_per_node to 3 → fewer paths, less exploration
+#   - Reduce token budgets → faster but may lose reasoning quality
+#   - For 8B model: change model.id to "mlx-community/DeepSeek-R1-0528-Qwen3-8B-8bit"
+#     and update ram thresholds (min_free_gb: 7.5, ideal_free_gb: 9.5)
