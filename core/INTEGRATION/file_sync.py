@@ -263,28 +263,49 @@ class ProjectFinder:
 
             description = f"Projecto Obsidian com {len(subfolders)} sub-pastas e {len(md_files)} ficheiros"
 
-            # Tentar encontrar contexto do projecto (preferência: contexto.md, depois variantes de README)
-            content_sample = ""
+            # PRIORIDADE 1: Manual Inputs — escritos pelo utilizador, contexto ground-truth
+            manual_content = ""
+            for manual_dir_name in ["Manual Inputs", "manual_inputs", "manual inputs"]:
+                manual_dir = folder_path / manual_dir_name
+                if manual_dir.is_dir():
+                    parts = []
+                    for md_file in sorted(manual_dir.glob("*.md")):
+                        with open(md_file, 'r', encoding='utf-8') as f:
+                            parts.append(f.read().strip())
+                    if parts:
+                        manual_content = "\n\n".join(parts)
+                    break
+
+            # PRIORIDADE 2: Ficheiros de contexto estruturados
+            structured_content = ""
             for fname in ["contexto.md", "README.md", "00_README.md", "INDEX.md",
                           "INDEX_FOR_AGENTS.md", "project.md"]:
                 readme_path = folder_path / fname
                 if readme_path.exists():
                     with open(readme_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    content_sample = content[:500]
-                    # Extrair primeira linha de conteúdo real (ignora headings e separadores)
-                    for line in content.split('\n'):
-                        stripped = line.strip()
-                        if not stripped or stripped.startswith('#') or stripped.startswith('---'):
-                            continue
-                        # Remove marcadores de lista/bold e toma como descrição
-                        clean = stripped.lstrip('-*> ').replace('**', '').strip()
-                        if len(clean) > 10:
-                            description = clean[:150]
-                            break
+                        structured_content = f.read()
                     break
 
-            return {
+            # Compor content_sample: Manual Inputs primeiro, depois contexto estruturado
+            if manual_content and structured_content:
+                content_sample = f"[Manual Input]\n{manual_content[:300]}\n\n[Contexto]\n{structured_content[:200]}"
+            elif manual_content:
+                content_sample = f"[Manual Input]\n{manual_content[:500]}"
+            else:
+                content_sample = structured_content[:500]
+
+            # Extrair descrição da primeira linha de conteúdo real
+            source_for_desc = manual_content or structured_content
+            for line in source_for_desc.split('\n'):
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#') or stripped.startswith('---'):
+                    continue
+                clean = stripped.lstrip('-*> ').replace('**', '').strip()
+                if len(clean) > 10:
+                    description = clean[:150]
+                    break
+
+            project = {
                 "title": title,
                 "description": description,
                 "source": "Obsidian",
@@ -294,6 +315,10 @@ class ProjectFinder:
                 "created": datetime.fromtimestamp(folder_path.stat().st_birthtime).isoformat(),
                 "modified": datetime.fromtimestamp(folder_path.stat().st_mtime).isoformat(),
             }
+            if manual_content:
+                project["manual_input"] = manual_content[:1000]
+                project["has_manual_input"] = True
+            return project
 
         except Exception as e:
             logger.error(f"Error reading Obsidian project: {e}")
