@@ -681,15 +681,24 @@ def _run_mcts(idea: str, business_type: str, budget: str, reset: bool):
             import psutil as _ps
             free_gb = _ps.virtual_memory().available / (1024**3)
             print(f"\n  {RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
-            print(f"  {RED}✗  Not enough RAM to load Qwen3-4B (needs 3.5 GB free){RESET}")
-            print(f"  {RED}   You have {free_gb:.1f} GB free right now.{RESET}")
-            print(f"\n  {GOLD}To free RAM, close:{RESET}")
-            print(f"  {GREY}  • Browser tabs (biggest consumer){RESET}")
-            print(f"  {GREY}  • Slack / Discord / Teams{RESET}")
-            print(f"  {GREY}  • VS Code / Cursor / other IDEs{RESET}")
-            print(f"  {GREY}  • Spotify / streaming apps{RESET}")
-            print(f"  {GREY}  • Any other open applications{RESET}")
-            print(f"\n  {GOLD}Then come back and try again.{RESET}")
+            if system.init_error == "ram":
+                print(f"  {RED}✗  Not enough RAM to load Qwen3-4B (needs 3.5 GB free){RESET}")
+                print(f"  {RED}   You have {free_gb:.1f} GB free right now.{RESET}")
+                print(f"\n  {GOLD}To free RAM, close:{RESET}")
+                print(f"  {GREY}  • Browser tabs (biggest consumer){RESET}")
+                print(f"  {GREY}  • Slack / Discord / Teams{RESET}")
+                print(f"  {GREY}  • VS Code / Cursor / other IDEs{RESET}")
+                print(f"  {GREY}  • Spotify / streaming apps{RESET}")
+                print(f"  {GREY}  • Any other open applications{RESET}")
+                print(f"\n  {GOLD}Then come back and try again.{RESET}")
+            else:
+                print(f"  {RED}✗  Failed to load Qwen3-4B model.{RESET}")
+                print(f"  {GREY}  Check the error above for details.{RESET}")
+                print(f"  {GREY}  Common causes:{RESET}")
+                print(f"  {GREY}  • First run: model not yet downloaded (~2.3 GB needed){RESET}")
+                print(f"  {GREY}  • No internet connection for first-time download{RESET}")
+                print(f"  {GREY}  • HuggingFace token required (run: huggingface-cli login){RESET}")
+                print(f"  {GOLD}  Model ID: mlx-community/Qwen3-4B-4bit{RESET}")
             print(f"  {RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
             return
 
@@ -1096,7 +1105,7 @@ def run_system_status():
 
     # Model info
     print(f"\n  {GREEN}Model Configuration{RESET}")
-    print(f"  Model:    Qwen3-4B-MLX-4bit  (~2.3 GB VRAM)")
+    print(f"  Model:    Qwen3-4B-4bit  (~2.3 GB VRAM)")
     print(f"  Framework: MLX (Apple Silicon optimised)")
 
     cache = Path.home() / ".cache" / "huggingface" / "hub"

@@ -1,7 +1,7 @@
 """
 Reasoning Agent + Qwen3-4B Loader
 
-Qwen3Loader  - Loads Qwen3-4B-MLX-4bit (~2.3GB, fits in 16GB M4 with headroom)
+Qwen3Loader  - Loads Qwen3-4B-4bit (~2.3GB, fits in 16GB M4 with headroom)
                Follows the same interface as MLXLLMLoader for easy swapping.
 
 ReasoningAgent - Drives long chain-of-thought reasoning for each themed agent:
@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # Model identifier (mlx-lm auto-downloads from HuggingFace on first run)
-QWEN3_MODEL_ID = "mlx-community/Qwen3-4B-MLX-4bit"
+QWEN3_MODEL_ID = "mlx-community/Qwen3-4B-4bit"
 
 # Minimum free RAM (GB) to load and generate with Qwen3-4B-4bit
 QWEN3_MIN_RAM_GB = 3.5
@@ -51,7 +51,7 @@ class Qwen3Loader:
         self.model = None
         self.tokenizer = None
         self.is_loaded = False
-        self.model_name = "Qwen3-4B-MLX-4bit"
+        self.model_name = "Qwen3-4B-4bit"
 
     def check_ram_availability(self) -> tuple[bool, str]:
         """Return (can_load, human-readable message)."""

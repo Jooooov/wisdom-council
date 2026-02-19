@@ -2,7 +2,7 @@
 War Room - Real Agent Collaboration using Qwen3-4B LLM
 
 Each agent discusses the business case with their personality/daemon influence.
-Uses Qwen3-4B-MLX-4bit for reasoning-based analysis.
+Uses Qwen3-4B-4bit for reasoning-based analysis.
 """
 
 import asyncio

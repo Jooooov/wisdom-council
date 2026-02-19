@@ -4,7 +4,7 @@ Advanced Reasoning System - His Dark Materials Wisdom Council v3
 Phase 1: MCTS tree search (4 branches → score → expand top-2)
 Phase 2: 4 themed agents (Lyra, Will, Mrs. Coulter, Iorek) + Meta-Daemon
 
-Model: Qwen3-4B-MLX-4bit  (~2.3 GB, sequential CoT reasoning)
+Model: Qwen3-4B-4bit  (~2.3 GB, sequential CoT reasoning)
 Target: MacBook Air M4, 16 GB RAM  (peak usage < 6 GB)
 
 Run:
@@ -65,6 +65,7 @@ class AdvancedReasoningSystem:
         self.agent: Optional[ReasoningAgent] = None
         self.router = DynamicRouter()
         self.memory = ReasoningMemory()
+        self.init_error: Optional[str] = None  # set when initialize() fails
 
         if reset_tree:
             self.tree.reset()
@@ -78,7 +79,7 @@ class AdvancedReasoningSystem:
         print("\n" + "=" * 70)
         print("🧭  ADVANCED REASONING SYSTEM")
         print("    His Dark Materials — Wisdom Council v3")
-        print("    MCTS + Qwen3-4B-MLX-4bit + Multi-Agent")
+        print("    MCTS + Qwen3-4B-4bit + Multi-Agent")
         print("=" * 70)
 
         # Show RAM status focused on Qwen3-4B requirements (not DeepSeek)
@@ -87,16 +88,18 @@ class AdvancedReasoningSystem:
         total = self.ram_manager.system_ram
         used  = total - avail
         print(f"\n  RAM:  {avail:.1f} GB free  /  {total:.0f} GB total  ({used:.1f} GB used)")
-        print(f"  Model: Qwen3-4B-MLX-4bit  (needs ≥ 3.5 GB free)")
+        print(f"  Model: Qwen3-4B-4bit  (needs ≥ 3.5 GB free)")
 
         ok, msg = self.llm_loader.check_ram_availability()
         print(f"  {msg}")
         if not ok:
+            self.init_error = "ram"
             print("\n  Tip: close browser tabs, IDEs, Slack, and other apps, then retry.")
             return False
 
         success = await self.llm_loader.load()
         if not success:
+            self.init_error = "load"
             return False
 
         self.agent = ReasoningAgent(self.llm_loader)

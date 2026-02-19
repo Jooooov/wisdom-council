@@ -1,7 +1,7 @@
 """
 LLM Module - Local Language Model Integration
 - RAM monitoring for safe model loading
-- Qwen3-4B-MLX-4bit loader with reasoning capability
+- Qwen3-4B-4bit loader with reasoning capability
 - Deep code analysis with semantic understanding and Portuguese support
 """
 

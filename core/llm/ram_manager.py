@@ -14,7 +14,7 @@ class RAMManager:
     """Manages RAM for LLM operations."""
 
     # Memory requirements (in GB)
-    # Using Qwen3-4B-MLX-4bit with reasoning + Portuguese
+    # Using Qwen3-4B-4bit with reasoning + Portuguese
     # 4-bit quantized MLX model: ~2.3GB model + ~1.2GB overhead + buffer
     QWEN3_4B_MIN = 3.5    # Minimum for Qwen3-4B (with reasoning + safety buffer)
     QWEN3_4B_IDEAL = 5.5  # Ideal for smooth operation
@@ -131,7 +131,7 @@ class RAMManager:
         print(f"Available RAM:    {status['available_ram_gb']} GB ({status['available_percentage']}%)")
         print(f"Used RAM:         {status['used_ram_gb']} GB")
 
-        print(f"\nQwen3-4B-MLX-4bit Requirements:")
+        print(f"\nQwen3-4B-4bit Requirements:")
         print(f"  Minimum:  {status['qwen3_4b_min_gb']} GB")
         print(f"  Ideal:    {status['qwen3_4b_ideal_gb']} GB")
         print(f"  Status:   {status['status_message']}")

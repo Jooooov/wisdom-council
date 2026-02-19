@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 # Model paths
 MLX_MODELS_DIR = Path.home() / "mlx-models"
-# Using Qwen3-4B-MLX-4bit with reasoning capability + Portuguese
+# Using Qwen3-4B-4bit with reasoning capability + Portuguese
 # This is the MLX-quantized version from mlx-community (auto-downloads from HuggingFace)
-QWEN3_MODEL_ID = "mlx-community/Qwen3-4B-MLX-4bit"
-QWEN3_MODEL_PATH = MLX_MODELS_DIR / "Qwen3-4B-MLX-4bit"
+QWEN3_MODEL_ID = "mlx-community/Qwen3-4B-4bit"
+QWEN3_MODEL_PATH = MLX_MODELS_DIR / "Qwen3-4B-4bit"
 
 
 class MLXLLMLoader:
