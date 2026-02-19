@@ -9,215 +9,120 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Model paths
-MLX_MODELS_DIR = Path.home() / "mlx-models"
-# Using Qwen3-4B-4bit with reasoning capability + Portuguese
-# This is the MLX-quantized version from mlx-community (auto-downloads from HuggingFace)
-QWEN3_8B_MODEL_ID = "mlx-community/Qwen3-8B-4bit"
-QWEN3_4B_MODEL_ID = "mlx-community/Qwen3-4B-4bit"
-# Default — overridden at load time based on available RAM
-QWEN3_MODEL_ID    = QWEN3_4B_MODEL_ID
-QWEN3_MODEL_PATH  = MLX_MODELS_DIR / "Qwen3-4B-4bit"
+# Local model store — shared across all apps
+MLX_STORE     = Path.home() / "Desktop" / "apps" / "MLX"
+QWEN3_8B_PATH = MLX_STORE / "Qwen3-8B-4bit"
+QWEN3_4B_PATH = MLX_STORE / "Qwen3-4B-4bit"
+
+# RAM thresholds
+QWEN3_8B_MIN_RAM_GB = 5.5
+QWEN3_4B_MIN_RAM_GB = 3.5
 
 
 class MLXLLMLoader:
-    """Loads and manages Qwen3-4B via MLX framework."""
+    """Loads Qwen3-8B-4bit or Qwen3-4B-4bit from ~/Desktop/apps/MLX/."""
 
     def __init__(self, ram_manager: Any):
         self.ram_manager = ram_manager
         self.model = None
         self.tokenizer = None
         self.is_loaded = False
-        self.model_name = "Qwen3-4B MLX"
-        self.model_path = QWEN3_MODEL_PATH
+        self.model_name = "Qwen3-4B-4bit"  # updated at load time
+        self.model_path = QWEN3_4B_PATH    # updated at load time
+
+    def _select_model(self) -> tuple[Path, str]:
+        """Return (local_path, display_name) based on free RAM."""
+        self.ram_manager.refresh()
+        if self.ram_manager.available_ram >= QWEN3_8B_MIN_RAM_GB:
+            return QWEN3_8B_PATH, "Qwen3-8B-4bit"
+        return QWEN3_4B_PATH, "Qwen3-4B-4bit"
 
     def model_exists(self) -> bool:
-        """Check if model files exist locally or can be downloaded from HuggingFace."""
-        # With HuggingFace models, mlx-lm will auto-download if not cached
-        # So we always return True - the load() call will handle downloading
-        return True
+        """Check if selected model exists locally."""
+        path, _ = self._select_model()
+        return path.exists() and (path / "config.json").exists()
 
     def can_load(self) -> bool:
-        """Check if model can be loaded (exists and RAM available)."""
+        """Check if model can be loaded (exists locally and RAM available)."""
         self.ram_manager.refresh()
         return self.model_exists() and self.ram_manager.can_run_qwen3_4b()
 
     def check_ram_availability(self) -> tuple[bool, str]:
-        """
-        Check RAM availability with detailed message.
-
-        Returns:
-            (can_load: bool, message: str)
-        """
+        """Return (can_load, human-readable message)."""
         self.ram_manager.refresh()
-
-        available = self.ram_manager.available_ram
-        minimum = self.ram_manager.QWEN3_4B_MIN
-        ideal = self.ram_manager.QWEN3_4B_IDEAL
-
-        if available >= ideal:
-            return True, f"✅ Excellent: {available:.1f}GB available (ideal: {ideal}GB)"
-        elif available >= minimum:
-            return True, f"✅ Good: {available:.1f}GB available (minimum: {minimum}GB, may be slower)"
+        gb = self.ram_manager.available_ram
+        if gb >= QWEN3_8B_MIN_RAM_GB:
+            return True, f"✅ Excellent: {gb:.1f}GB free — will use Qwen3-8B-4bit"
+        elif gb >= QWEN3_4B_MIN_RAM_GB:
+            return True, f"✅ Good: {gb:.1f}GB free — will use Qwen3-4B-4bit"
         else:
-            deficit = minimum - available
             return False, (
-                f"❌ CRITICAL: Insufficient RAM!\n"
-                f"   Available: {available:.1f}GB\n"
-                f"   Required: {minimum}GB minimum\n"
-                f"   Deficit: {deficit:.1f}GB short!\n"
-                f"\n   SOLUTIONS:\n"
-                f"   1. Close all browser tabs\n"
-                f"   2. Close Slack, Discord, email clients\n"
-                f"   3. Close IDEs and text editors\n"
-                f"   4. Restart your MacBook\n"
-                f"   5. Try again in a minute or two"
+                f"❌ Insufficient RAM: {gb:.1f}GB free (need {QWEN3_4B_MIN_RAM_GB}GB).\n"
+                f"   Close browser tabs, IDEs, Slack, and other apps."
             )
 
     async def load(self, force: bool = False) -> bool:
-        """
-        Load DeepSeek-R1-Distill-Qwen-8B model via MLX with RAM guardrails.
-
-        Args:
-            force: Force load even if RAM is low (NOT RECOMMENDED!)
-
-        Returns:
-            True if loaded successfully, False otherwise
-        """
-
+        """Load the selected Qwen3 model from ~/Desktop/apps/MLX/."""
         if self.is_loaded:
-            logger.info("✅ Qwen3-4B already loaded")
             return True
 
-        # Note: Model will be auto-downloaded from HuggingFace if not cached locally
-        # No need to pre-check existence - mlx-lm handles downloading
+        ok, msg = self.check_ram_availability()
+        print(msg)
+        if not ok and not force:
+            return False
 
-        # RAM Check with detailed guardrails
-        self.ram_manager.refresh()
+        path, name = self._select_model()
+        self.model_name = name
+        self.model_path = path
 
-        # GUARDRAIL 1: Hard minimum check
-        if self.ram_manager.available_ram < self.ram_manager.QWEN3_4B_MIN:
-            logger.critical(
-                f"❌ CRITICAL: Insufficient RAM!\n"
-                f"   Available: {self.ram_manager.available_ram:.1f}GB\n"
-                f"   Required: {self.ram_manager.QWEN3_4B_MIN}GB minimum\n"
-                f"   Deficit: {self.ram_manager.QWEN3_4B_MIN - self.ram_manager.available_ram:.1f}GB short!\n"
-                f"\n   Solutions:\n"
-                f"   1. Close browser tabs, IDEs, Slack, etc.\n"
-                f"   2. Restart your MacBook\n"
-                f"   3. Close ALL other applications\n"
-                f"   4. Try again in 1-2 minutes"
-            )
-            if not force:
-                return False
-            else:
-                logger.warning("⚠️  Force loading with insufficient RAM - risk of crash!")
-
-        # GUARDRAIL 2: Ideal RAM warning
-        if self.ram_manager.available_ram < self.ram_manager.QWEN3_4B_IDEAL:
-            logger.warning(
-                f"⚠️  WARNING: RAM below ideal threshold!\n"
-                f"   Available: {self.ram_manager.available_ram:.1f}GB\n"
-                f"   Ideal: {self.ram_manager.QWEN3_4B_IDEAL}GB\n"
-                f"   Model will work but may be slower or unstable\n"
-                f"   Recommendation: Close other applications"
-            )
-            print(f"\n⚠️  WARNING: Running below ideal RAM conditions!")
-            print(f"   Available: {self.ram_manager.available_ram:.1f}GB (ideal: {self.ram_manager.QWEN3_4B_IDEAL}GB)")
-            print(f"   Close other apps for better performance\n")
-
-        # GUARDRAIL 3: Normal operation
-        self.ram_manager.warn_if_low("qwen3_4b")
-
-        # Select best model based on RAM
-        avail = self.ram_manager.available_ram
-        active_model_id = QWEN3_8B_MODEL_ID if avail >= 5.5 else QWEN3_4B_MODEL_ID
-        active_model_name = "Qwen3-8B-4bit" if avail >= 5.5 else "Qwen3-4B-4bit"
-        size_hint = "~4.5GB" if avail >= 5.5 else "~2.3GB"
-        self.model_name = active_model_name
+        # Guard: model must exist locally — no downloads
+        if not path.exists() or not (path / "config.json").exists():
+            print(f"\n❌ Model not found: {path}")
+            print(f"   Run the download script:")
+            print(f"   python3 ~/Desktop/apps/MLX/download_models.py")
+            return False
 
         try:
             print("\n" + "=" * 70)
-            print(f"🔄 Loading {active_model_name} MLX Model")
+            print(f"🔄 Loading {name}")
             print("=" * 70)
-            print(f"Model: {active_model_name}")
-            print(f"HuggingFace ID: {active_model_id}")
-            print(f"Available RAM: {self.ram_manager.available_ram:.1f}GB")
-            print(f"Required: {self.ram_manager.QWEN3_4B_MIN}GB minimum")
-            print(f"\n⏳ Loading (first time takes ~30-60 seconds, auto-downloads {size_hint})...")
+            print(f"   Path:  {path}")
+            print(f"   RAM:   {self.ram_manager.available_ram:.1f}GB free")
+            print(f"\n⏳ Loading model (may take ~30 seconds)...")
 
-            # GUARDRAIL 4: Pre-load RAM check
-            self.ram_manager.refresh()
-            if self.ram_manager.available_ram < self.ram_manager.QWEN3_4B_MIN:
-                raise MemoryError(
-                    f"Insufficient RAM for model loading! "
-                    f"Available: {self.ram_manager.available_ram:.1f}GB, "
-                    f"Required: {self.ram_manager.QWEN3_4B_MIN}GB"
-                )
-
-            # Load using MLX
-            self.model, self.tokenizer = await self._load_mlx(active_model_id)
+            self.model, self.tokenizer = await self._load_mlx(path)
 
             if self.model is not None and self.tokenizer is not None:
                 self.is_loaded = True
-
-                # GUARDRAIL 5: Post-load RAM verification
                 self.ram_manager.refresh()
-                logger.info(f"✅ Successfully loaded {self.model_name}")
-                print(f"✅ Model loaded successfully!")
-                print(f"   RAM used: ~2.3GB")
-                print(f"   Available for other apps: ~{max(0, self.ram_manager.available_ram - 2.3):.1f}GB")
-
-                # Warn if remaining RAM is too low
-                if self.ram_manager.available_ram < 3:
-                    logger.warning(
-                        f"⚠️  Very low RAM remaining ({self.ram_manager.available_ram:.1f}GB)!\n"
-                        f"   Generation may be slow or cause crashes.\n"
-                        f"   Close other applications before using the model."
-                    )
-
+                logger.info(f"✅ Successfully loaded {name}")
+                print(f"✅ {name} loaded!")
+                print(f"   RAM remaining: ~{self.ram_manager.available_ram:.1f}GB free")
                 return True
             else:
                 logger.error("Failed to load model via MLX")
                 return False
 
         except MemoryError as e:
-            logger.critical(f"❌ MEMORY ERROR: {e}")
-            print(f"\n❌ MEMORY ERROR: {e}")
-            print(f"\nSolutions:")
-            print(f"  1. Close all other applications (browsers, IDEs, Slack, etc.)")
-            print(f"  2. Restart your MacBook and try again")
-            print(f"  3. Wait a minute for other processes to complete")
+            print(f"\n❌ Out of RAM: {e}")
+            print(f"   Close other applications and try again.")
             return False
 
         except Exception as e:
-            logger.error(f"Error loading Qwen3-4B: {e}")
-            print(f"\n❌ Failed to load model: {e}")
-            if "out of memory" in str(e).lower() or "memory" in str(e).lower():
-                print(f"\n💡 This appears to be a memory error. Try:")
-                print(f"   1. Close other applications")
-                print(f"   2. Restart your MacBook")
-                print(f"   3. Check: python -c \"from core.llm import create_ram_manager; create_ram_manager().print_status()\"")
+            logger.error(f"Error loading {name}: {e}")
+            print(f"\n❌ Failed to load {name}: {e}")
             return False
 
-    async def _load_mlx(self, model_id: str = QWEN3_4B_MODEL_ID) -> Tuple[Any, Any]:
-        """Load model using MLX framework."""
+    async def _load_mlx(self, model_path: Path) -> Tuple[Any, Any]:
+        """Load model from local path using MLX."""
         try:
             from mlx_lm import load
-
-            print("   Using MLX (Apple Silicon unified memory)...")
-            print(f"   Model ID: {model_id}")
-            print(f"   (Auto-downloading from HuggingFace if not cached locally)")
-
-            # Load model and tokenizer from HuggingFace (mlx-lm auto-downloads and caches)
-            model, tokenizer = load(model_id)
-
-            logger.info("✅ Model loaded successfully via MLX")
+            print(f"   Using MLX (Apple Silicon unified memory)...")
+            model, tokenizer = load(str(model_path))
+            logger.info("✅ Model loaded via MLX")
             return model, tokenizer
-
         except ImportError as e:
             logger.error(f"MLX not installed: {e}")
-            logger.info("Install with: pip install mlx-lm")
             raise
         except Exception as e:
             logger.error(f"MLX load failed: {e}")
