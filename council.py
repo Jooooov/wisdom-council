@@ -430,9 +430,14 @@ def _project_actions(council, project):
             _pause()
 
         elif choice == "2":
-            idea = project.get(
-                "description",
-                project.get("obsidian_project", {}).get("description", project["title"])
+            # Use content_sample (actual project content) as idea — far more meaningful than
+            # the generic description "Projecto Obsidian com X sub-pastas e Y ficheiros"
+            idea = (
+                project.get("content_sample")
+                or project.get("obsidian_project", {}).get("content_sample")
+                or project.get("apps_project", {}).get("content_sample")
+                or project.get("description")
+                or project["title"]
             )
             _run_mcts(idea=str(idea)[:300], business_type="project", budget="Unknown", reset=True)
 

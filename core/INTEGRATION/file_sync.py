@@ -263,13 +263,25 @@ class ProjectFinder:
 
             description = f"Projecto Obsidian com {len(subfolders)} sub-pastas e {len(md_files)} ficheiros"
 
-            # Tentar encontrar arquivo README ou INDEX
+            # Tentar encontrar contexto do projecto (preferência: contexto.md, depois variantes de README)
             content_sample = ""
-            for readme in ["README.md", "INDEX.md", "project.md"]:
-                readme_path = folder_path / readme
+            for fname in ["contexto.md", "README.md", "00_README.md", "INDEX.md",
+                          "INDEX_FOR_AGENTS.md", "project.md"]:
+                readme_path = folder_path / fname
                 if readme_path.exists():
                     with open(readme_path, 'r', encoding='utf-8') as f:
-                        content_sample = f.read()[:500]
+                        content = f.read()
+                    content_sample = content[:500]
+                    # Extrair primeira linha de conteúdo real (ignora headings e separadores)
+                    for line in content.split('\n'):
+                        stripped = line.strip()
+                        if not stripped or stripped.startswith('#') or stripped.startswith('---'):
+                            continue
+                        # Remove marcadores de lista/bold e toma como descrição
+                        clean = stripped.lstrip('-*> ').replace('**', '').strip()
+                        if len(clean) > 10:
+                            description = clean[:150]
+                            break
                     break
 
             return {
