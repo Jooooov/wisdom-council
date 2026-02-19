@@ -217,7 +217,13 @@ class AdvancedReasoningSystem:
         print("─" * 50)
 
         evaluated_summary = self._build_evaluated_summary()
-        meta_output = await self.agent.meta_daemon_decide(business_idea, evaluated_summary)
+        # Meta-Daemon already has the full branch analysis — it doesn't need the
+        # manual-context preamble.  Extract only the core topic to save tokens.
+        if "[Analysis topic]" in business_idea:
+            meta_idea = business_idea.split("[Analysis topic]")[-1].strip()[:200]
+        else:
+            meta_idea = business_idea[:200]
+        meta_output = await self.agent.meta_daemon_decide(meta_idea, evaluated_summary)
 
         if not meta_output:
             meta_output = {

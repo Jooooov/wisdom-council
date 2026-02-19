@@ -416,10 +416,13 @@ def _project_actions(council, project):
             print(f"  {GREY}{str(project['description'])[:80]}{RESET}")
         print()
 
-        _opt("1", "⚔️ ", "War Room Analysis",   "— 8 agents deep-dive with LLM reasoning")
-        _opt("2", "⚡", "MCTS Quick Analysis",  "— tree search on this project's core idea")
-        _opt("3", "📊", "View Past Outputs",    "— browse previous analysis results")
-        _opt("0", "↩ ", "Back",                 "")
+        has_manual = project.get("has_manual_input") or project.get("obsidian_project", {}).get("has_manual_input")
+        _opt("1", "⚔️ ", "War Room Analysis",    "— 8 agents deep-dive with LLM reasoning")
+        _opt("2", "⚡", "MCTS Quick Analysis",   "— tree search on this project's core idea")
+        _opt("3", "📊", "View Past Outputs",     "— browse previous analysis results")
+        if has_manual:
+            _opt("4", "✂️ ", "Optimise Context",  "— compress Manual Inputs to save tokens (LLM rewrites)")
+        _opt("0", "↩ ", "Back",                  "")
         _line()
 
         choice = _ask("Choose")
@@ -446,10 +449,88 @@ def _project_actions(council, project):
         elif choice == "3":
             _browse_outputs(project)
 
+        elif choice == "4" and has_manual:
+            _optimise_project_context(project)
+
         elif choice == "0" or choice is None:
             return
         else:
             _err("Invalid choice.")
+
+
+def _optimise_project_context(project):
+    """Use the LLM to compress Manual Inputs into dense, token-efficient bullet points."""
+    # Resolve manual input text and its source file
+    obs = project.get("obsidian_project") or project
+    manual_text = obs.get("manual_input", "")
+    if not manual_text:
+        _info("No Manual Inputs found for this project.")
+        _pause()
+        return
+
+    obs_path = Path(obs.get("path", ""))
+    manual_file = None
+    for dir_name in ["Manual Inputs", "manual_inputs", "manual inputs"]:
+        candidate = obs_path / dir_name
+        if candidate.is_dir():
+            files = sorted(candidate.glob("*.md"))
+            if files:
+                manual_file = files[0]
+            break
+
+    clr()
+    print(f"\n{GOLD}{BOLD}  ✂️  OPTIMISE CONTEXT — {project['title'].upper()}{RESET}")
+    _line()
+    print(f"\n  {GREY}Current Manual Inputs ({len(manual_text)} chars):{RESET}")
+    print(f"  {GREY}{manual_text[:300]}...{RESET}\n")
+    print(f"  The LLM will rewrite this as concise bullet points,")
+    print(f"  preserving every key fact but eliminating prose.")
+    print(f"  Original file kept as .bak before overwriting.\n")
+
+    confirm = _ask("Proceed? [y/N]")
+    if confirm and confirm.lower() == "y":
+        async def _compress():
+            from advanced_reasoning import AdvancedReasoningSystem
+            system = AdvancedReasoningSystem(reset_tree=False)
+            print(f"\n  {GREY}Loading model…{RESET}")
+            if not await system.initialize():
+                _err("Could not load model.")
+                return None
+            prompt = (
+                "<|im_start|>system\n"
+                "You are a context compressor. Rewrite the input as dense, "
+                "token-efficient bullet points. Preserve every fact, number, name "
+                "and decision. Remove all prose, greetings, and repetition. "
+                "Output plain text bullets only, no JSON, no markdown headers."
+                "<|im_end|>\n"
+                f"<|im_start|>user\n{manual_text}\n\n"
+                "Compress this to the shortest form that retains all information. /no_think"
+                "<|im_end|>\n"
+                "<|im_start|>assistant\n"
+            )
+            raw = await system.llm_loader.generate(prompt, max_tokens=600)
+            return raw.strip()
+
+        compressed = asyncio.run(_compress())
+        if compressed:
+            clr()
+            print(f"\n{GOLD}{BOLD}  ✅ COMPRESSED VERSION ({len(compressed)} chars vs {len(manual_text)} original){RESET}")
+            _line()
+            print(f"\n{compressed}\n")
+            _line()
+            save = _ask("Save this version? [y/N]")
+            if save and save.lower() == "y" and manual_file:
+                # Back up original
+                bak = manual_file.with_suffix(".md.bak")
+                bak.write_text(manual_file.read_text())
+                manual_file.write_text(compressed)
+                _ok(f"Saved → {manual_file.name}  (original → {bak.name})")
+                # Invalidate project finder cache so next scan picks up new content
+                import core.INTEGRATION.file_sync as _fs
+                _fs._project_finder = None
+            elif save and save.lower() == "y":
+                _warn("Could not find source file to overwrite — copy the text above manually.")
+        _pause()
 
 
 def _browse_outputs(project):
