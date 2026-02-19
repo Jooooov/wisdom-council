@@ -1,8 +1,8 @@
 """
-War Room - Real Agent Collaboration using DeepSeek-R1 LLM
+War Room - Real Agent Collaboration using Qwen3-4B LLM
 
 Each agent discusses the business case with their personality/daemon influence.
-Uses DeepSeek-R1-0528-Qwen3-8B-8bit for reasoning-based analysis.
+Uses Qwen3-4B-MLX-4bit for reasoning-based analysis.
 """
 
 import asyncio
@@ -91,7 +91,7 @@ class WarRoom:
             return False
 
         # Load LLM
-        print("\n⏳ Carregando DeepSeek-R1 LLM para raciocínio de agentes...")
+        print("\n⏳ Carregando Qwen3-4B LLM para raciocínio de agentes...")
         success = await self.llm_loader.load()
 
         if success:

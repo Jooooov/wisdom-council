@@ -34,7 +34,7 @@ class CLIMenu:
         """Print welcome banner."""
         print("\n" + "=" * 80)
         print("  " + "🧙‍♂️  THE WISDOM COUNCIL - Agent Collaboration & Business Analysis".center(76))
-        print("  " + "DeepSeek-R1-8B Powered | Portuguese + Reasoning".center(76))
+        print("  " + "Qwen3-4B Powered | Portuguese + Reasoning".center(76))
         print("=" * 80)
         print()
 

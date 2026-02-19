@@ -1,5 +1,5 @@
 """
-MLX LLM Loader - Loads and manages DeepSeek-R1-Distill-Qwen-8B via MLX
+MLX LLM Loader - Loads and manages Qwen3-4B via MLX
 Optimized for Apple Silicon with Portuguese + Reasoning
 """
 
@@ -11,22 +11,22 @@ logger = logging.getLogger(__name__)
 
 # Model paths
 MLX_MODELS_DIR = Path.home() / "mlx-models"
-# Using DeepSeek-R1-Distill-Qwen-8B with reasoning capability + Portuguese
+# Using Qwen3-4B-MLX-4bit with reasoning capability + Portuguese
 # This is the MLX-quantized version from mlx-community (auto-downloads from HuggingFace)
-DEEPSEEK_R1_MODEL_ID = "mlx-community/DeepSeek-R1-0528-Qwen3-8B-8bit"
-DEEPSEEK_R1_PATH = MLX_MODELS_DIR / "DeepSeek-R1-0528-Qwen3-8B-8bit"
+QWEN3_MODEL_ID = "mlx-community/Qwen3-4B-MLX-4bit"
+QWEN3_MODEL_PATH = MLX_MODELS_DIR / "Qwen3-4B-MLX-4bit"
 
 
 class MLXLLMLoader:
-    """Loads and manages DeepSeek-R1-Distill-Qwen-8B via MLX framework."""
+    """Loads and manages Qwen3-4B via MLX framework."""
 
     def __init__(self, ram_manager: Any):
         self.ram_manager = ram_manager
         self.model = None
         self.tokenizer = None
         self.is_loaded = False
-        self.model_name = "DeepSeek-R1-Distill-Qwen-8B MLX"
-        self.model_path = DEEPSEEK_R1_PATH
+        self.model_name = "Qwen3-4B MLX"
+        self.model_path = QWEN3_MODEL_PATH
 
     def model_exists(self) -> bool:
         """Check if model files exist locally or can be downloaded from HuggingFace."""
@@ -37,7 +37,7 @@ class MLXLLMLoader:
     def can_load(self) -> bool:
         """Check if model can be loaded (exists and RAM available)."""
         self.ram_manager.refresh()
-        return self.model_exists() and self.ram_manager.can_run_deepseek_14b()
+        return self.model_exists() and self.ram_manager.can_run_qwen3_4b()
 
     def check_ram_availability(self) -> tuple[bool, str]:
         """
@@ -49,8 +49,8 @@ class MLXLLMLoader:
         self.ram_manager.refresh()
 
         available = self.ram_manager.available_ram
-        minimum = self.ram_manager.DEEPSEEK_R1_8B_MIN
-        ideal = self.ram_manager.DEEPSEEK_R1_8B_IDEAL
+        minimum = self.ram_manager.QWEN3_4B_MIN
+        ideal = self.ram_manager.QWEN3_4B_IDEAL
 
         if available >= ideal:
             return True, f"✅ Excellent: {available:.1f}GB available (ideal: {ideal}GB)"
@@ -83,7 +83,7 @@ class MLXLLMLoader:
         """
 
         if self.is_loaded:
-            logger.info("✅ DeepSeek-R1-Distill-Qwen-8B already loaded")
+            logger.info("✅ Qwen3-4B already loaded")
             return True
 
         # Note: Model will be auto-downloaded from HuggingFace if not cached locally
@@ -93,12 +93,12 @@ class MLXLLMLoader:
         self.ram_manager.refresh()
 
         # GUARDRAIL 1: Hard minimum check
-        if self.ram_manager.available_ram < self.ram_manager.DEEPSEEK_R1_8B_MIN:
+        if self.ram_manager.available_ram < self.ram_manager.QWEN3_4B_MIN:
             logger.critical(
                 f"❌ CRITICAL: Insufficient RAM!\n"
                 f"   Available: {self.ram_manager.available_ram:.1f}GB\n"
-                f"   Required: {self.ram_manager.DEEPSEEK_R1_8B_MIN}GB minimum\n"
-                f"   Deficit: {self.ram_manager.DEEPSEEK_R1_8B_MIN - self.ram_manager.available_ram:.1f}GB short!\n"
+                f"   Required: {self.ram_manager.QWEN3_4B_MIN}GB minimum\n"
+                f"   Deficit: {self.ram_manager.QWEN3_4B_MIN - self.ram_manager.available_ram:.1f}GB short!\n"
                 f"\n   Solutions:\n"
                 f"   1. Close browser tabs, IDEs, Slack, etc.\n"
                 f"   2. Restart your MacBook\n"
@@ -111,38 +111,38 @@ class MLXLLMLoader:
                 logger.warning("⚠️  Force loading with insufficient RAM - risk of crash!")
 
         # GUARDRAIL 2: Ideal RAM warning
-        if self.ram_manager.available_ram < self.ram_manager.DEEPSEEK_R1_8B_IDEAL:
+        if self.ram_manager.available_ram < self.ram_manager.QWEN3_4B_IDEAL:
             logger.warning(
                 f"⚠️  WARNING: RAM below ideal threshold!\n"
                 f"   Available: {self.ram_manager.available_ram:.1f}GB\n"
-                f"   Ideal: {self.ram_manager.DEEPSEEK_R1_8B_IDEAL}GB\n"
+                f"   Ideal: {self.ram_manager.QWEN3_4B_IDEAL}GB\n"
                 f"   Model will work but may be slower or unstable\n"
                 f"   Recommendation: Close other applications"
             )
             print(f"\n⚠️  WARNING: Running below ideal RAM conditions!")
-            print(f"   Available: {self.ram_manager.available_ram:.1f}GB (ideal: {self.ram_manager.DEEPSEEK_R1_8B_IDEAL}GB)")
+            print(f"   Available: {self.ram_manager.available_ram:.1f}GB (ideal: {self.ram_manager.QWEN3_4B_IDEAL}GB)")
             print(f"   Close other apps for better performance\n")
 
         # GUARDRAIL 3: Normal operation
-        self.ram_manager.warn_if_low("deepseek_r1")
+        self.ram_manager.warn_if_low("qwen3_4b")
 
         try:
             print("\n" + "=" * 70)
-            print("🔄 Loading DeepSeek-R1-Distill-Qwen-8B MLX Model")
+            print("🔄 Loading Qwen3-4B MLX Model")
             print("=" * 70)
             print(f"Model: {self.model_name}")
-            print(f"HuggingFace ID: {DEEPSEEK_R1_MODEL_ID}")
+            print(f"HuggingFace ID: {QWEN3_MODEL_ID}")
             print(f"Available RAM: {self.ram_manager.available_ram:.1f}GB")
-            print(f"Required: {self.ram_manager.DEEPSEEK_R1_8B_MIN}GB minimum")
-            print(f"\n⏳ Loading (first time takes ~30-60 seconds, auto-downloads ~4GB)...")
+            print(f"Required: {self.ram_manager.QWEN3_4B_MIN}GB minimum")
+            print(f"\n⏳ Loading (first time takes ~30-60 seconds, auto-downloads ~2.3GB)...")
 
             # GUARDRAIL 4: Pre-load RAM check
             self.ram_manager.refresh()
-            if self.ram_manager.available_ram < self.ram_manager.DEEPSEEK_R1_8B_MIN:
+            if self.ram_manager.available_ram < self.ram_manager.QWEN3_4B_MIN:
                 raise MemoryError(
                     f"Insufficient RAM for model loading! "
                     f"Available: {self.ram_manager.available_ram:.1f}GB, "
-                    f"Required: {self.ram_manager.DEEPSEEK_R1_8B_MIN}GB"
+                    f"Required: {self.ram_manager.QWEN3_4B_MIN}GB"
                 )
 
             # Load using MLX
@@ -155,8 +155,8 @@ class MLXLLMLoader:
                 self.ram_manager.refresh()
                 logger.info(f"✅ Successfully loaded {self.model_name}")
                 print(f"✅ Model loaded successfully!")
-                print(f"   RAM used: ~8GB")
-                print(f"   Available for other apps: ~{max(0, self.ram_manager.available_ram - 8):.1f}GB")
+                print(f"   RAM used: ~2.3GB")
+                print(f"   Available for other apps: ~{max(0, self.ram_manager.available_ram - 2.3):.1f}GB")
 
                 # Warn if remaining RAM is too low
                 if self.ram_manager.available_ram < 3:
@@ -181,7 +181,7 @@ class MLXLLMLoader:
             return False
 
         except Exception as e:
-            logger.error(f"Error loading DeepSeek-R1-Distill-Qwen-8B: {e}")
+            logger.error(f"Error loading Qwen3-4B: {e}")
             print(f"\n❌ Failed to load model: {e}")
             if "out of memory" in str(e).lower() or "memory" in str(e).lower():
                 print(f"\n💡 This appears to be a memory error. Try:")
@@ -196,11 +196,11 @@ class MLXLLMLoader:
             from mlx_lm import load
 
             print("   Using MLX (Apple Silicon optimized)...")
-            print(f"   Model ID: {DEEPSEEK_R1_MODEL_ID}")
+            print(f"   Model ID: {QWEN3_MODEL_ID}")
             print(f"   (Auto-downloading from HuggingFace if not cached locally)")
 
             # Load model and tokenizer from HuggingFace (mlx-lm auto-downloads and caches)
-            model, tokenizer = load(DEEPSEEK_R1_MODEL_ID)
+            model, tokenizer = load(QWEN3_MODEL_ID)
 
             logger.info("✅ Model loaded successfully via MLX")
             return model, tokenizer
@@ -220,7 +220,7 @@ class MLXLLMLoader:
         temperature: float = 0.7,
     ) -> str:
         """
-        Generate text using DeepSeek-R1-Distill-Qwen-8B MLX with RAM protection.
+        Generate text using Qwen3-4B MLX with RAM protection.
 
         Args:
             prompt: Input prompt

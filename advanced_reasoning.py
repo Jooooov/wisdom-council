@@ -77,11 +77,18 @@ class AdvancedReasoningSystem:
         print("    MCTS + Qwen3-4B-MLX-4bit + Multi-Agent")
         print("=" * 70)
 
-        self.ram_manager.print_status()
+        # Show RAM status focused on Qwen3-4B requirements (not DeepSeek)
+        self.ram_manager.refresh()
+        avail = self.ram_manager.available_ram
+        total = self.ram_manager.system_ram
+        used  = total - avail
+        print(f"\n  RAM:  {avail:.1f} GB free  /  {total:.0f} GB total  ({used:.1f} GB used)")
+        print(f"  Model: Qwen3-4B-MLX-4bit  (needs ≥ 3.5 GB free)")
 
         ok, msg = self.llm_loader.check_ram_availability()
+        print(f"  {msg}")
         if not ok:
-            print(f"\n{msg}")
+            print("\n  Tip: close browser tabs, IDEs, Slack, and other apps, then retry.")
             return False
 
         success = await self.llm_loader.load()

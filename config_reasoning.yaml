@@ -53,5 +53,4 @@ output:
 #   - Reduce max_depth to 2 → ~30 LLM calls, ~15-25 min
 #   - Reduce branches_per_node to 3 → fewer paths, less exploration
 #   - Reduce token budgets → faster but may lose reasoning quality
-#   - For 8B model: change model.id to "mlx-community/DeepSeek-R1-0528-Qwen3-8B-8bit"
-#     and update ram thresholds (min_free_gb: 7.5, ideal_free_gb: 9.5)
+#   - Model: mlx-community/Qwen3-4B-MLX-4bit (~2.3 GB, needs 3.5 GB free RAM)

@@ -431,7 +431,7 @@ def _project_actions(council, project):
                 "description",
                 project.get("obsidian_project", {}).get("description", project["title"])
             )
-            _run_mcts(idea=str(idea)[:300], business_type="project", reset=True)
+            _run_mcts(idea=str(idea)[:300], business_type="project", budget="Unknown", reset=True)
 
         elif choice == "3":
             _browse_outputs(project)
@@ -675,7 +675,19 @@ def _run_mcts(idea: str, business_type: str, budget: str, reset: bool):
         system = AdvancedReasoningSystem(reset_tree=reset)
 
         if not await system.initialize():
-            _err("System failed to initialise. Check RAM and that mlx-lm is installed.")
+            import psutil as _ps
+            free_gb = _ps.virtual_memory().available / (1024**3)
+            print(f"\n  {RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
+            print(f"  {RED}✗  Not enough RAM to load Qwen3-4B (needs 3.5 GB free){RESET}")
+            print(f"  {RED}   You have {free_gb:.1f} GB free right now.{RESET}")
+            print(f"\n  {GOLD}To free RAM, close:{RESET}")
+            print(f"  {GREY}  • Browser tabs (biggest consumer){RESET}")
+            print(f"  {GREY}  • Slack / Discord / Teams{RESET}")
+            print(f"  {GREY}  • VS Code / Cursor / other IDEs{RESET}")
+            print(f"  {GREY}  • Spotify / streaming apps{RESET}")
+            print(f"  {GREY}  • Any other open applications{RESET}")
+            print(f"\n  {GOLD}Then come back and try again.{RESET}")
+            print(f"  {RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
             return
 
         result = await system.run_analysis(
@@ -1081,16 +1093,13 @@ def run_system_status():
 
     # Model info
     print(f"\n  {GREEN}Model Configuration{RESET}")
-    print(f"  Primary:  Qwen3-4B-MLX-4bit  (~2.3 GB VRAM)")
-    print(f"  Fallback: DeepSeek-R1-0528-Qwen3-8B-8bit  (~8 GB VRAM)")
+    print(f"  Model:    Qwen3-4B-MLX-4bit  (~2.3 GB VRAM)")
     print(f"  Framework: MLX (Apple Silicon optimised)")
 
     cache = Path.home() / ".cache" / "huggingface" / "hub"
     if cache.exists():
         qwen_cached = any("Qwen3-4B" in str(p) for p in cache.iterdir() if p.is_dir())
-        ds_cached   = any("DeepSeek" in str(p) for p in cache.iterdir() if p.is_dir())
-        print(f"\n  Qwen3-4B cached:     {'✅ Yes' if qwen_cached else '⬇️  Will download on first run (~2.3 GB)'}")
-        print(f"  DeepSeek-8B cached:  {'✅ Yes' if ds_cached   else '⬇️  Will download on first run (~8 GB)'}")
+        print(f"\n  Qwen3-4B cached:  {'✅ Yes' if qwen_cached else '⬇️  Will download on first run (~2.3 GB)'}")
 
     # MCTS state
     print(f"\n  {GREEN}MCTS State{RESET}")
@@ -1155,7 +1164,7 @@ def run_help():
         ("WAR ROOM [2]",
          "Select an existing project from ~/Obsidian-Vault/ or ~/Desktop/apps/\n"
          "   All 8 agents discuss it in depth using LLM reasoning.\n"
-         "   Uses the heavier DeepSeek-8B model (requires 7.5 GB+ free RAM)."),
+         "   Uses Qwen3-4B (requires 3.5 GB+ free RAM)."),
 
         ("VALIDATE AN IDEA [5]",
          "Quick check in 5-10 min.\n"
@@ -1169,7 +1178,6 @@ def run_help():
 
         ("RAM TIPS",
          "Qwen3-4B-4bit: needs 3.5 GB free RAM (peak ~3.8 GB)\n"
-         "   DeepSeek-8B: needs 7.5 GB free RAM\n"
          "   Close browser tabs and other apps before a long analysis.\n"
          "   The system checks RAM before every generation call."),
 

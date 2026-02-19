@@ -40,7 +40,7 @@ class Qwen3Loader:
     """
     Lightweight MLX loader for Qwen3-4B-4bit.
 
-    Follows the same interface as MLXLLMLoader (core/llm/deepseek_loader.py)
+    Follows the same interface as MLXLLMLoader (core/llm/qwen3_loader.py)
     so WarRoom or other callers can swap models without changing call sites.
 
     RAM footprint: ~2.3 GB model + ~1.5 GB KV-cache/overhead = ~3.8 GB total

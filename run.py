@@ -3,7 +3,7 @@
 The Wisdom Council v2 - Simplified, Practical, Powerful
 
 A leaner multi-agent system that works on REAL projects.
-With DeepSeek-R1-Distill-Qwen-14B and RAM guardrails.
+With Qwen3-4B-MLX-4bit and RAM guardrails.
 """
 
 import sys
@@ -81,7 +81,7 @@ class WisdomCouncil:
         """Print welcome header."""
         print("\n" + "="*70)
         print("  🧙‍♂️  THE WISDOM COUNCIL v2")
-        print("  DeepSeek-R1-Distill-Qwen-14B with RAM Protection")
+        print("  Qwen3-4B-MLX-4bit with RAM Protection")
         print("  Simplified. Practical. Powerful.")
         print("="*70 + "\n")
 
