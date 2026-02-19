@@ -79,7 +79,7 @@ class AdvancedReasoningSystem:
         print("\n" + "=" * 70)
         print("🧭  ADVANCED REASONING SYSTEM")
         print("    His Dark Materials — Wisdom Council v3")
-        print("    MCTS + Qwen3-4B-4bit + Multi-Agent")
+        print("    MCTS + Qwen3 (8B or 4B auto-selected) + Multi-Agent")
         print("=" * 70)
 
         # Show RAM status focused on Qwen3-4B requirements (not DeepSeek)
@@ -88,7 +88,8 @@ class AdvancedReasoningSystem:
         total = self.ram_manager.system_ram
         used  = total - avail
         print(f"\n  RAM:  {avail:.1f} GB free  /  {total:.0f} GB total  ({used:.1f} GB used)")
-        print(f"  Model: Qwen3-4B-4bit  (needs ≥ 3.5 GB free)")
+        selected_id, selected_name = self.llm_loader._select_model()
+        print(f"  Model: {selected_name}  (auto-selected based on free RAM)")
 
         ok, msg = self.llm_loader.check_ram_availability()
         print(f"  {msg}")

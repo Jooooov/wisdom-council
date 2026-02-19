@@ -1,8 +1,9 @@
 """
-Reasoning Agent + Qwen3-4B Loader
+Reasoning Agent + Qwen3 Loader
 
-Qwen3Loader  - Loads Qwen3-4B-4bit (~2.3GB, fits in 16GB M4 with headroom)
-               Follows the same interface as MLXLLMLoader for easy swapping.
+Qwen3Loader  - Auto-selects best Qwen3 model based on available RAM:
+               • Qwen3-8B-4bit  (~4.5 GB)  if RAM ≥ 5.5 GB  — better reasoning
+               • Qwen3-4B-4bit  (~2.3 GB)  if RAM < 5.5 GB   — always fits
 
 ReasoningAgent - Drives long chain-of-thought reasoning for each themed agent:
     - Lyra (Exploradora)   : generates 4 creative branches
@@ -24,12 +25,14 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Model identifier (mlx-lm auto-downloads from HuggingFace on first run)
-QWEN3_MODEL_ID = "mlx-community/Qwen3-4B-4bit"
+# Model options (mlx-lm auto-downloads from HuggingFace on first run)
+QWEN3_8B_MODEL_ID  = "mlx-community/Qwen3-8B-4bit"   # ~4.5 GB — better reasoning
+QWEN3_4B_MODEL_ID  = "mlx-community/Qwen3-4B-4bit"   # ~2.3 GB — always fits
 
-# Minimum free RAM (GB) to load and generate with Qwen3-4B-4bit
-QWEN3_MIN_RAM_GB = 3.5
-QWEN3_IDEAL_RAM_GB = 5.5
+# RAM thresholds (GB)
+QWEN3_8B_MIN_RAM_GB   = 5.5   # need this much free to attempt 8B
+QWEN3_4B_MIN_RAM_GB   = 3.5   # hard minimum for 4B
+QWEN3_4B_IDEAL_RAM_GB = 5.5   # ideal for 4B (shared threshold)
 
 
 # ---------------------------------------------------------------------------
@@ -38,12 +41,12 @@ QWEN3_IDEAL_RAM_GB = 5.5
 
 class Qwen3Loader:
     """
-    Lightweight MLX loader for Qwen3-4B-4bit.
+    MLX loader that auto-selects Qwen3-8B-4bit or Qwen3-4B-4bit based on RAM.
 
-    Follows the same interface as MLXLLMLoader (core/llm/qwen3_loader.py)
-    so WarRoom or other callers can swap models without changing call sites.
-
-    RAM footprint: ~2.3 GB model + ~1.5 GB KV-cache/overhead = ~3.8 GB total
+    Selection logic:
+      RAM ≥ 5.5 GB → try Qwen3-8B-4bit (better reasoning quality)
+                      if that fails → fallback to Qwen3-4B-4bit
+      RAM < 5.5 GB → use Qwen3-4B-4bit directly (safe, always fits)
     """
 
     def __init__(self, ram_manager: Any):
@@ -51,24 +54,32 @@ class Qwen3Loader:
         self.model = None
         self.tokenizer = None
         self.is_loaded = False
-        self.model_name = "Qwen3-4B-4bit"
+        self.model_name = "Qwen3-4B-4bit"   # updated after successful load
+        self._model_id = QWEN3_4B_MODEL_ID   # updated after successful load
+
+    def _select_model(self) -> tuple[str, str]:
+        """Return (model_id, display_name) based on current free RAM."""
+        self.ram_manager.refresh()
+        if self.ram_manager.available_ram >= QWEN3_8B_MIN_RAM_GB:
+            return QWEN3_8B_MODEL_ID, "Qwen3-8B-4bit"
+        return QWEN3_4B_MODEL_ID, "Qwen3-4B-4bit"
 
     def check_ram_availability(self) -> tuple[bool, str]:
         """Return (can_load, human-readable message)."""
         self.ram_manager.refresh()
         gb = self.ram_manager.available_ram
-        if gb >= QWEN3_IDEAL_RAM_GB:
-            return True, f"✅ Excellent: {gb:.1f}GB free (ideal ≥ {QWEN3_IDEAL_RAM_GB}GB)"
-        elif gb >= QWEN3_MIN_RAM_GB:
-            return True, f"✅ Good: {gb:.1f}GB free (minimum {QWEN3_MIN_RAM_GB}GB)"
+        if gb >= QWEN3_8B_MIN_RAM_GB:
+            return True, f"✅ Excellent: {gb:.1f}GB free — will use Qwen3-8B-4bit"
+        elif gb >= QWEN3_4B_MIN_RAM_GB:
+            return True, f"✅ Good: {gb:.1f}GB free — will use Qwen3-4B-4bit (fallback)"
         else:
             return False, (
-                f"❌ Need {QWEN3_MIN_RAM_GB}GB, only {gb:.1f}GB free.\n"
+                f"❌ Need {QWEN3_4B_MIN_RAM_GB}GB minimum, only {gb:.1f}GB free.\n"
                 f"   Close browser tabs, IDEs, and other apps."
             )
 
     async def load(self, force: bool = False) -> bool:
-        """Load Qwen3-4B via mlx-lm (auto-downloads ~2.3GB on first run)."""
+        """Load best available Qwen3 model. Falls back to 4B if 8B fails."""
         if self.is_loaded:
             return True
 
@@ -77,27 +88,46 @@ class Qwen3Loader:
         if not ok and not force:
             return False
 
-        try:
-            from mlx_lm import load
+        model_id, name = self._select_model()
 
-            print(f"\n⏳ Loading {self.model_name}")
-            print(f"   HuggingFace ID: {QWEN3_MODEL_ID}")
-            print(f"   (First run: ~2.3GB download and cache)")
+        # Try primary model, then fallback to 4B if it fails
+        for mid, mname, size_hint in [
+            (model_id, name, "~4.5GB" if "8B" in name else "~2.3GB"),
+            (QWEN3_4B_MODEL_ID, "Qwen3-4B-4bit", "~2.3GB"),
+        ]:
+            if mid == model_id or mid != QWEN3_4B_MODEL_ID:
+                pass  # always try primary first
+            elif mid == QWEN3_4B_MODEL_ID and model_id == QWEN3_4B_MODEL_ID:
+                break  # already tried 4B as primary, no point retrying
 
-            self.model, self.tokenizer = load(QWEN3_MODEL_ID)
-            self.is_loaded = True
+            try:
+                from mlx_lm import load
 
-            self.ram_manager.refresh()
-            print(f"✅ {self.model_name} loaded!")
-            print(f"   RAM remaining: ~{self.ram_manager.available_ram:.1f}GB free\n")
-            return True
+                print(f"\n⏳ Loading {mname}")
+                print(f"   HuggingFace ID: {mid}")
+                print(f"   (First run: {size_hint} download and cache)")
 
-        except ImportError:
-            print("❌ mlx-lm not installed. Run: pip install mlx-lm")
-            return False
-        except Exception as e:
-            print(f"❌ Load failed: {e}")
-            return False
+                self.model, self.tokenizer = load(mid)
+                self.is_loaded = True
+                self.model_name = mname
+                self._model_id = mid
+
+                self.ram_manager.refresh()
+                print(f"✅ {mname} loaded!")
+                print(f"   RAM remaining: ~{self.ram_manager.available_ram:.1f}GB free\n")
+                return True
+
+            except ImportError:
+                print("❌ mlx-lm not installed. Run: pip install mlx-lm")
+                return False
+            except Exception as e:
+                print(f"❌ Load failed ({mname}): {e}")
+                if mid == model_id and model_id != QWEN3_4B_MODEL_ID:
+                    print(f"   ↳ Retrying with fallback: Qwen3-4B-4bit...")
+                    continue
+                return False
+
+        return False
 
     async def generate(self, prompt: str, max_tokens: int = 512) -> str:
         """Generate text. Raises RuntimeError if model not loaded."""

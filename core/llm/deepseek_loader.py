@@ -13,8 +13,11 @@ logger = logging.getLogger(__name__)
 MLX_MODELS_DIR = Path.home() / "mlx-models"
 # Using Qwen3-4B-4bit with reasoning capability + Portuguese
 # This is the MLX-quantized version from mlx-community (auto-downloads from HuggingFace)
-QWEN3_MODEL_ID = "mlx-community/Qwen3-4B-4bit"
-QWEN3_MODEL_PATH = MLX_MODELS_DIR / "Qwen3-4B-4bit"
+QWEN3_8B_MODEL_ID = "mlx-community/Qwen3-8B-4bit"
+QWEN3_4B_MODEL_ID = "mlx-community/Qwen3-4B-4bit"
+# Default — overridden at load time based on available RAM
+QWEN3_MODEL_ID    = QWEN3_4B_MODEL_ID
+QWEN3_MODEL_PATH  = MLX_MODELS_DIR / "Qwen3-4B-4bit"
 
 
 class MLXLLMLoader:
@@ -126,15 +129,22 @@ class MLXLLMLoader:
         # GUARDRAIL 3: Normal operation
         self.ram_manager.warn_if_low("qwen3_4b")
 
+        # Select best model based on RAM
+        avail = self.ram_manager.available_ram
+        active_model_id = QWEN3_8B_MODEL_ID if avail >= 5.5 else QWEN3_4B_MODEL_ID
+        active_model_name = "Qwen3-8B-4bit" if avail >= 5.5 else "Qwen3-4B-4bit"
+        size_hint = "~4.5GB" if avail >= 5.5 else "~2.3GB"
+        self.model_name = active_model_name
+
         try:
             print("\n" + "=" * 70)
-            print("🔄 Loading Qwen3-4B MLX Model")
+            print(f"🔄 Loading {active_model_name} MLX Model")
             print("=" * 70)
-            print(f"Model: {self.model_name}")
-            print(f"HuggingFace ID: {QWEN3_MODEL_ID}")
+            print(f"Model: {active_model_name}")
+            print(f"HuggingFace ID: {active_model_id}")
             print(f"Available RAM: {self.ram_manager.available_ram:.1f}GB")
             print(f"Required: {self.ram_manager.QWEN3_4B_MIN}GB minimum")
-            print(f"\n⏳ Loading (first time takes ~30-60 seconds, auto-downloads ~2.3GB)...")
+            print(f"\n⏳ Loading (first time takes ~30-60 seconds, auto-downloads {size_hint})...")
 
             # GUARDRAIL 4: Pre-load RAM check
             self.ram_manager.refresh()
@@ -146,7 +156,7 @@ class MLXLLMLoader:
                 )
 
             # Load using MLX
-            self.model, self.tokenizer = await self._load_mlx()
+            self.model, self.tokenizer = await self._load_mlx(active_model_id)
 
             if self.model is not None and self.tokenizer is not None:
                 self.is_loaded = True
@@ -190,17 +200,17 @@ class MLXLLMLoader:
                 print(f"   3. Check: python -c \"from core.llm import create_ram_manager; create_ram_manager().print_status()\"")
             return False
 
-    async def _load_mlx(self) -> Tuple[Any, Any]:
+    async def _load_mlx(self, model_id: str = QWEN3_4B_MODEL_ID) -> Tuple[Any, Any]:
         """Load model using MLX framework."""
         try:
             from mlx_lm import load
 
-            print("   Using MLX (Apple Silicon optimized)...")
-            print(f"   Model ID: {QWEN3_MODEL_ID}")
+            print("   Using MLX (Apple Silicon unified memory)...")
+            print(f"   Model ID: {model_id}")
             print(f"   (Auto-downloading from HuggingFace if not cached locally)")
 
             # Load model and tokenizer from HuggingFace (mlx-lm auto-downloads and caches)
-            model, tokenizer = load(QWEN3_MODEL_ID)
+            model, tokenizer = load(model_id)
 
             logger.info("✅ Model loaded successfully via MLX")
             return model, tokenizer

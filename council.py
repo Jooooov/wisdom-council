@@ -181,7 +181,7 @@ def print_banner(quote=True):
     print("  ║                                                                   ║")
     print("  ║        ✦   HIS DARK MATERIALS — WISDOM COUNCIL v3   ✦            ║")
     print("  ║                                                                   ║")
-    print("  ║    Qwen3-4B · MCTS Reasoning · 8 Agents · Built for YOU           ║")
+    print("  ║   Qwen3-8B/4B · MCTS Reasoning · 8 Agents · Built for YOU         ║")
     print("  ║                                                                   ║")
     print(f"  ╚═══════════════════════════════════════════════════════════════════╝{RESET}")
 
@@ -542,7 +542,7 @@ def run_idea_validator():
 
     budget = _ask("Budget range (optional)", "Unknown")
 
-    print(f"\n  {CYAN}Loading Qwen3-4B…{RESET}")
+    print(f"\n  {CYAN}Loading model…{RESET}")
 
     async def _validate():
         from core.llm.ram_manager import RAMManager
@@ -682,7 +682,7 @@ def _run_mcts(idea: str, business_type: str, budget: str, reset: bool):
             free_gb = _ps.virtual_memory().available / (1024**3)
             print(f"\n  {RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
             if system.init_error == "ram":
-                print(f"  {RED}✗  Not enough RAM to load Qwen3-4B (needs 3.5 GB free){RESET}")
+                print(f"  {RED}✗  Not enough RAM (need 3.5 GB free for Qwen3-4B, 5.5 GB for Qwen3-8B){RESET}")
                 print(f"  {RED}   You have {free_gb:.1f} GB free right now.{RESET}")
                 print(f"\n  {GOLD}To free RAM, close:{RESET}")
                 print(f"  {GREY}  • Browser tabs (biggest consumer){RESET}")
@@ -1095,23 +1095,33 @@ def run_system_status():
         print(f"  Available: {avail:.1f} GB  ({100 - pct:.0f}% free)")
         print(f"  Used:      {used:.1f} GB  ({pct:.0f}% used)")
 
-        qwen_ok  = avail >= 3.5
-        ideal_ok = avail >= 5.5
-        status   = "✅ Ready for Qwen3-4B" if qwen_ok else "❌ Need 3.5GB+ free"
-        quality  = "🏆 Ideal conditions" if ideal_ok else ("✅ OK" if qwen_ok else "⚠️ Low")
+        qwen4b_ok = avail >= 3.5
+        qwen8b_ok = avail >= 5.5
+        if qwen8b_ok:
+            status  = "✅ Qwen3-8B-4bit  (best quality)"
+            quality = "🏆 Excellent"
+        elif qwen4b_ok:
+            status  = "✅ Qwen3-4B-4bit  (fallback)"
+            quality = "✅ Good"
+        else:
+            status  = "❌ Need 3.5 GB+ free"
+            quality = "⚠️ Low"
         print(f"\n  Model readiness: {quality}  —  {status}")
     except Exception:
         _warn("Could not read memory info.")
 
     # Model info
     print(f"\n  {GREEN}Model Configuration{RESET}")
-    print(f"  Model:    Qwen3-4B-4bit  (~2.3 GB VRAM)")
+    print(f"  Primary:  Qwen3-8B-4bit  (~4.5 GB RAM)  — if ≥ 5.5 GB free")
+    print(f"  Fallback: Qwen3-4B-4bit  (~2.3 GB RAM)  — always fits")
     print(f"  Framework: MLX (Apple Silicon optimised)")
 
     cache = Path.home() / ".cache" / "huggingface" / "hub"
     if cache.exists():
-        qwen_cached = any("Qwen3-4B" in str(p) for p in cache.iterdir() if p.is_dir())
-        print(f"\n  Qwen3-4B cached:  {'✅ Yes' if qwen_cached else '⬇️  Will download on first run (~2.3 GB)'}")
+        q8b_cached = any("Qwen3-8B" in str(p) for p in cache.iterdir() if p.is_dir())
+        q4b_cached = any("Qwen3-4B" in str(p) for p in cache.iterdir() if p.is_dir())
+        print(f"\n  Qwen3-8B-4bit cached:  {'✅ Yes' if q8b_cached else '⬇️  Will download on first use (~4.5 GB)'}")
+        print(f"  Qwen3-4B-4bit cached:  {'✅ Yes' if q4b_cached else '⬇️  Will download on first use (~2.3 GB)'}")
 
     # MCTS state
     print(f"\n  {GREEN}MCTS State{RESET}")
@@ -1160,7 +1170,7 @@ def run_help():
     sections = [
         ("GETTING STARTED",
          "1. Double-click launch.command to open in Terminal\n"
-         "   2. First run: Qwen3-4B (~2.3 GB) downloads automatically\n"
+         "   2. First run: model downloads automatically (2.3–4.5 GB)\n"
          "   3. Choose an option from the main menu"),
 
         ("QUICK ANALYSIS [1]",
@@ -1176,7 +1186,7 @@ def run_help():
         ("WAR ROOM [2]",
          "Select an existing project from ~/Obsidian-Vault/ or ~/Desktop/apps/\n"
          "   All 8 agents discuss it in depth using LLM reasoning.\n"
-         "   Uses Qwen3-4B (requires 3.5 GB+ free RAM)."),
+         "   Uses Qwen3-8B-4bit (5.5 GB+ free) or Qwen3-4B-4bit (3.5 GB+ free)."),
 
         ("VALIDATE AN IDEA [5]",
          "Quick check in 5-10 min.\n"
@@ -1189,9 +1199,10 @@ def run_help():
          "   Lyra uses them to generate better branches next time."),
 
         ("RAM TIPS",
-         "Qwen3-4B-4bit: needs 3.5 GB free RAM (peak ~3.8 GB)\n"
+         "Qwen3-8B-4bit: needs 5.5 GB free RAM — auto-selected if available\n"
+         "   Qwen3-4B-4bit: needs 3.5 GB free RAM — fallback, always fits\n"
          "   Close browser tabs and other apps before a long analysis.\n"
-         "   The system checks RAM before every generation call."),
+         "   System checks RAM on startup and selects the best model automatically."),
 
         ("RESULTS",
          "JSON results saved automatically in outputs/ folder.\n"
