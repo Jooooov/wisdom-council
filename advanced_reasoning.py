@@ -28,6 +28,10 @@ Architecture:
     State persisted to ~/.mcts_reasoning/ between runs.
 """
 
+import os
+# Fix OpenMP duplicate lib conflict (numpy + mlx on macOS)
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 import argparse
 import asyncio
 import json

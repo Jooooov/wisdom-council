@@ -9,9 +9,12 @@ Double-click launch.command to open in Terminal.
 Or run directly: python3 council.py
 """
 
+import os
+# Fix OpenMP duplicate lib conflict (numpy + mlx on macOS)
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 import asyncio
 import json
-import os
 import random
 import sys
 import time

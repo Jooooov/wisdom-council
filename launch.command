@@ -46,5 +46,8 @@ if ! $PYTHON -m pip show psutil > /dev/null 2>&1; then
     $PYTHON -m pip install psutil --quiet
 fi
 
+# ── Fix OpenMP duplicate lib conflict (numpy + mlx on macOS) ────────────
+export KMP_DUPLICATE_LIB_OK=TRUE
+
 # ── Launch ──────────────────────────────────────────────────────────────
 exec $PYTHON council.py
