@@ -15,6 +15,7 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import asyncio
 import json
+import re
 import random
 import sys
 import time
@@ -430,8 +431,8 @@ def _project_actions(council, project):
             _pause()
 
         elif choice == "2":
-            # Use content_sample (actual project content) as idea — far more meaningful than
-            # the generic description "Projecto Obsidian com X sub-pastas e Y ficheiros"
+            # Use content_sample as the base idea; full project passed so _run_mcts
+            # can prepend Manual Inputs and tag the output file with the project name.
             idea = (
                 project.get("content_sample")
                 or project.get("obsidian_project", {}).get("content_sample")
@@ -439,7 +440,8 @@ def _project_actions(council, project):
                 or project.get("description")
                 or project["title"]
             )
-            _run_mcts(idea=str(idea)[:300], business_type="project", budget="Unknown", reset=True)
+            _run_mcts(idea=str(idea)[:300], business_type="project",
+                      budget="Unknown", reset=True, project=project)
 
         elif choice == "3":
             _browse_outputs(project)
@@ -451,9 +453,29 @@ def _project_actions(council, project):
 
 
 def _browse_outputs(project):
-    path = Path(project.get("path", project.get("apps_project", {}).get("path", ".")))
-    outputs = list(path.glob("outputs/*.json")) + list(path.glob("*.json"))
-    outputs = [f for f in outputs if "result" in f.name.lower() or "analysis" in f.name.lower()]
+    project_title = project.get("title", "")
+    slug = re.sub(r'[^a-zA-Z0-9]+', '_', project_title).strip('_') if project_title else ""
+
+    # Always look in ROOT/outputs — that's where all MCTS results land.
+    # Filter by project slug in filename (fast) or "project" field in JSON (fallback).
+    outputs_dir = ROOT / "outputs"
+    outputs = []
+    if outputs_dir.exists():
+        for f in sorted(outputs_dir.glob("mcts_*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+            if slug and slug.lower() in f.name.lower():
+                outputs.append(f)
+            elif not slug:
+                outputs.append(f)
+
+        # Fallback: check JSON content for untagged old files
+        if not outputs and slug:
+            for f in sorted(outputs_dir.glob("mcts_*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+                try:
+                    data = json.loads(f.read_text())
+                    if data.get("project", "").lower() == project_title.lower():
+                        outputs.append(f)
+                except Exception:
+                    pass
 
     if not outputs:
         _info("No saved outputs found for this project.")
@@ -677,9 +699,25 @@ def run_continue_analysis():
 # ║  MCTS RUNNER (shared by multiple menus)                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-def _run_mcts(idea: str, business_type: str, budget: str, reset: bool):
+def _run_mcts(idea: str, business_type: str, budget: str, reset: bool, project: dict = None):
     async def _go():
         from advanced_reasoning import AdvancedReasoningSystem
+
+        # Enrich idea with Manual Inputs (ground-truth context written by owner)
+        project_title = project.get("title", "") if project else ""
+        manual = ""
+        if project:
+            manual = (
+                project.get("manual_input")
+                or project.get("obsidian_project", {}).get("manual_input")
+                or project.get("apps_project", {}).get("manual_input")
+                or ""
+            )
+        if manual:
+            full_idea = f"[Manual Context — written by owner]\n{manual}\n\n[Analysis topic]\n{idea}"
+        else:
+            full_idea = idea
+
         system = AdvancedReasoningSystem(reset_tree=reset)
 
         if not await system.initialize():
@@ -708,7 +746,7 @@ def _run_mcts(idea: str, business_type: str, budget: str, reset: bool):
             return
 
         result = await system.run_analysis(
-            business_idea=idea,
+            business_idea=full_idea,
             business_type=business_type,
             budget=budget,
             reset=reset,
@@ -765,8 +803,13 @@ def _run_mcts(idea: str, business_type: str, budget: str, reset: bool):
                 else:
                     print(f"    ⚠️  {r}")
 
-        # Save output
-        out_path = ROOT / "outputs" / f"mcts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        # Tag result with project and save with project slug in filename
+        if project_title:
+            result["project"] = project_title
+        slug = re.sub(r'[^a-zA-Z0-9]+', '_', project_title).strip('_') if project_title else ""
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        fname = f"mcts_{slug}_{ts}.json" if slug else f"mcts_{ts}.json"
+        out_path = ROOT / "outputs" / fname
         out_path.parent.mkdir(exist_ok=True)
         out_path.write_text(json.dumps(result, indent=2, ensure_ascii=False))
         print(f"\n  {GREY}Full JSON saved → {out_path.name}{RESET}")
