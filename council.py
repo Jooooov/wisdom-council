@@ -228,6 +228,7 @@ def show_main_menu():
     print()
     print(_bar("  SYSTEM"))
     _opt("s", "💻", "System Status",     "— RAM · model · storage · agent scores")
+    _opt("c", "✂️ ", "Optimise Context",  "— compress Manual Inputs to free up token budget")
     _opt("h", "📖", "Help",              "— how to use the council")
     _opt("q", "🚪", "Exit",              "")
 
@@ -1356,6 +1357,44 @@ def run_help():
 # ║  MAIN LOOP                                                               ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
+def run_optimise_context():
+    """Main-menu entry: pick a project with Manual Inputs and compress it."""
+    from core.INTEGRATION.file_sync import ProjectFinder
+    clr()
+    print(f"\n{GOLD}{BOLD}  ✂️  OPTIMISE CONTEXT{RESET}")
+    _line()
+    print(f"  {GREY}Finds projects with Manual Inputs and uses the LLM to compress them")
+    print(f"  into dense bullet points — same facts, fewer tokens per analysis.{RESET}\n")
+
+    finder = ProjectFinder()
+    all_projects = finder.find_all_projects()
+    candidates = [p for p in all_projects if
+                  p.get("has_manual_input")
+                  or p.get("obsidian_project", {}).get("has_manual_input")]
+
+    if not candidates:
+        _info("No projects with Manual Inputs found.")
+        _info("Create  ~/Obsidian-Vault/1 - Projectos/<name>/Manual Inputs/<file>.md")
+        _pause()
+        return
+
+    for i, p in enumerate(candidates, 1):
+        manual = p.get("manual_input") or p.get("obsidian_project", {}).get("manual_input", "")
+        print(f"  [{i}]  {CYAN}{p['title']}{RESET}  {GREY}({len(manual)} chars){RESET}")
+    print(f"  [0]  {GREY}↩ Back{RESET}")
+    _line()
+
+    choice = _ask("Choose project")
+    if not choice or choice == "0":
+        return
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(candidates):
+            _optimise_project_context(candidates[idx])
+    except ValueError:
+        _err("Invalid choice.")
+
+
 MENU_MAP = {
     "1": run_quick_analysis,
     "2": run_war_room_menu,
@@ -1367,6 +1406,7 @@ MENU_MAP = {
     "8": run_memory_menu,
     "9": run_search,
     "s": run_system_status,
+    "c": run_optimise_context,
     "h": run_help,
 }
 
