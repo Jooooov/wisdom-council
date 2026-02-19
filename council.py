@@ -518,9 +518,11 @@ def _optimise_project_context(project):
                 "(2) Use standard abbreviations: co=company, rev=revenue, emp=employee(s), "
                 "mgmt=management, ops=operations, ~=approximately, PT=Portugal, BR=Brazil, "
                 "yr=year, mo=month, k=thousand, w/=with, w/o=without, vs=versus. "
-                "(3) Drop articles (the/a/an), filler words, and obvious context. "
-                "(4) Merge related facts into one bullet. "
-                "(5) Numbers stay exact. Names stay exact. "
+                "(3) No spaces around special chars: write ~200k not '~ 200k', "
+                "w/internal not 'w/ internal', 1partner+1emp not '1 partner + 1 emp'. "
+                "(4) Drop articles (the/a/an), filler words, and obvious context. "
+                "(5) Merge related facts into one bullet. "
+                "(6) Numbers stay exact. Names stay exact. "
                 "Output ONLY the bullet list — no headers, no prose, no JSON."
                 "<|im_end|>\n"
                 f"<|im_start|>user\n{manual_text}\n\n"
@@ -533,6 +535,12 @@ def _optimise_project_context(project):
             # Strip any <think>...</think> blocks (complete or truncated)
             raw = _re.sub(r"<think>.*?</think>", "", raw, flags=_re.DOTALL)
             raw = _re.sub(r"<think>.*$", "", raw, flags=_re.DOTALL).strip()
+            # Post-process: remove spaces around special chars
+            raw = _re.sub(r"~\s+", "~", raw)               # ~ 200  → ~200
+            raw = _re.sub(r"\s*/\s*", "/", raw)             # w/ ops → w/ops  (also x / y → x/y)
+            raw = _re.sub(r"\s*\+\s*", "+", raw)            # 1 + 1  → 1+1
+            raw = _re.sub(r"\s*→\s*", "→", raw)             # A → B  → A→B
+            raw = _re.sub(r"\s*·\s*", "·", raw)             # a · b  → a·b
             # Restore the leading bullet we injected to guide the model
             if raw and not raw.startswith("-"):
                 raw = "- " + raw
