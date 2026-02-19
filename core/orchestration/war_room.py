@@ -370,17 +370,8 @@ Responde em português."""
         print(f"   │    Desafia {agent.name} com perspectiva complementar{' ' * (10 - len(agent.name))}│")
         print(f"   {'├' + '─' * 66 + '┤'}")
 
-        critique_lines = critique.split('\n')
-        for line in critique_lines[:5]:
-            wrapped = line[:62] if len(line) > 62 else line
-            print(f"   │    {wrapped:<62}│")
-
-        print(f"   {'├' + '─' * 66 + '┤'}")
-        print(f"   │ 🔄 OPINIÃO CONSOLIDADA DE {agent.name.upper():<38}│")
-        print(f"   {'├' + '─' * 66 + '┤'}")
-
-        consolidated_lines = consolidated.split('\n')
-        for line in consolidated_lines[:4]:
+        critique_lines = [l.strip() for l in critique.split('\n') if l.strip()]
+        for line in critique_lines[:6]:
             wrapped = line[:62] if len(line) > 62 else line
             print(f"   │    {wrapped:<62}│")
 
@@ -467,10 +458,15 @@ Responde em português."""
 
             print(f"\n{'🟢' if is_go else '🔴'} DECISÃO FINAL:")
             print(f"   {recommendation['decision']}")
-            print(f"\n📋 Raciocínio (da análise LLM):")
-            for line in recommendation_text.split('\n')[:3]:
-                if line.strip():
-                    print(f"   • {line.strip()}")
+            print(f"\n📋 Raciocínio Final:")
+            lines = [l.strip() for l in recommendation_text.split('\n') if l.strip()]
+            unique_lines = []
+            for l in lines:
+                if l not in unique_lines and len(l) > 10:
+                    unique_lines.append(l)
+            
+            for line in unique_lines[:3]:
+                print(f"   • {line}")
 
             return recommendation
 
@@ -707,14 +703,19 @@ Forneça raciocínio claro para sua recomendação. Responda em português."""
         print(f"   │    Daemon: {daemon:<57}│")
         print(f"   {'├' + '─' * 66 + '┤'}")
 
-        # Show reasoning with word wrap
-        reasoning_lines = reasoning.split('\n')
+        # Show reasoning with word wrap and duplicate detection
+        reasoning_lines = [l.strip() for l in reasoning.split('\n') if l.strip()]
+        unique_lines = []
+        for l in reasoning_lines:
+            if l not in unique_lines:
+                unique_lines.append(l)
+
         print(f"   │ 💭 RACIOCÍNIO:                                          │")
-        for line in reasoning_lines[:5]:  # Show first 5 lines
+        for line in unique_lines[:5]:  # Show first 5 unique lines
             wrapped_line = line[:62] if len(line) > 62 else line
             print(f"   │    {wrapped_line:<62}│")
-        if len(reasoning_lines) > 5:
-            print(f"   │    ... ({len(reasoning_lines)-5} mais linhas de raciocínio) │")
+        if len(unique_lines) > 5:
+            print(f"   │    ... ({len(unique_lines)-5} mais linhas)               │")
 
         # Show key points
         if key_points:
