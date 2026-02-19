@@ -266,7 +266,7 @@ class AdvancedReasoningSystem:
     async def _simulate_nodes(
         self, nodes: List[MCTSNode], business_idea: str, budget: str
     ):
-        """Run Will → Mrs. Coulter → Iorek on each node, then score it."""
+        """Run Iorek → Marisa → Coram on each node, then score it."""
         for node in nodes:
             print(f"\n  ┌─ Simulating [{node.branch_label}]")
             print(f"  │  {node.description[:70]}")
@@ -276,29 +276,7 @@ class AdvancedReasoningSystem:
             coulter_result = None
             iorek_result = None
 
-            tasks = [
-                (
-                    "Will",
-                    lambda n=node: self.agent.will_validate(n.description, business_idea),
-                ),
-            ]
-            step1 = await self.router.run_sequential(tasks)
-            will_result = step1.get("Will")
-            node.will_assessment = will_result or {}
-
-            tasks2 = [
-                (
-                    "Mrs.Coulter",
-                    lambda n=node, w=node.will_assessment: self.agent.coulter_assess_risks(
-                        n.description, w
-                    ),
-                ),
-            ]
-            step2 = await self.router.run_sequential(tasks2)
-            coulter_result = step2.get("Mrs.Coulter")
-            node.coulter_risks = coulter_result or {}
-
-            tasks3 = [
+            tasks1 = [
                 (
                     "Iorek",
                     lambda n=node: self.agent.iorek_model_financials(
@@ -306,18 +284,40 @@ class AdvancedReasoningSystem:
                     ),
                 ),
             ]
-            step3 = await self.router.run_sequential(tasks3)
-            iorek_result = step3.get("Iorek")
+            step1 = await self.router.run_sequential(tasks1)
+            iorek_result = step1.get("Iorek")
             node.iorek_financials = iorek_result or {}
 
+            tasks2 = [
+                (
+                    "Marisa",
+                    lambda n=node, i=node.iorek_financials: self.agent.marisa_assess_risks(
+                        n.description, i
+                    ),
+                ),
+            ]
+            step2 = await self.router.run_sequential(tasks2)
+            marisa_result = step2.get("Marisa")
+            node.coulter_risks = marisa_result or {}
+
+            tasks3 = [
+                (
+                    "Coram",
+                    lambda n=node: self.agent.coram_validate(n.description, business_idea),
+                ),
+            ]
+            step3 = await self.router.run_sequential(tasks3)
+            coram_result = step3.get("Coram")
+            node.will_assessment = coram_result or {}
+
             # Extract scores (default 0.5 if agent returned None)
-            feasibility = float((will_result or {}).get("feasibility_score", 0.5))
-            risk = float((coulter_result or {}).get("risk_score", 0.5))
+            feasibility = float((coram_result or {}).get("feasibility_score", 0.5))
+            risk = float((marisa_result or {}).get("risk_score", 0.5))
             financial = float((iorek_result or {}).get("financial_score", 0.5))
 
             self.tree.mark_evaluated(node, feasibility, risk, financial)
 
-            verdict = (will_result or {}).get("verdict", "?")
+            verdict = (coram_result or {}).get("verdict", "?")
             print(
                 f"  └─ Scores: feasibility={feasibility:.2f} | "
                 f"risk={risk:.2f} | financial={financial:.2f} "

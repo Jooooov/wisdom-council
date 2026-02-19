@@ -169,6 +169,7 @@ class WisdomCouncil:
         from core.analysis.business_analyzer import analyze_business
         from core.orchestration.war_room import run_war_room
         from core.research.web_researcher import research_project
+        from core.research.context_enricher import ContextEnricher
         from core.agents.devops_agent import DevOpsAgent
         from core.memory.rag_memory import create_rag_memory
 
@@ -185,15 +186,22 @@ class WisdomCouncil:
         devops = DevOpsAgent(str(project_path))
         devops_status = devops.analyze_workflow()
 
-        # Step 2: Web Research
-        print("\n🌐 Step 2/4: Web Research - Finding Similar Projects & Tools")
+        # Step 2: Strategic Enrichment (File Analysis + Perplexity Deep Research)
+        print("\n🌐 Step 2/4: Strategic Enrichment & Market Research")
         print("-" * 70)
+        enricher = ContextEnricher(str(project_path))
+        # This will analyze files and perform deep research on market/tech
+        await enricher.perform_strategic_research()
+        enriched_context = enricher.get_enriched_context()
+        
+        # Also run dedicated web research for tools/repos
         research_findings = await research_project(project['title'], project.get('type', 'software'))
 
         # Step 3: Business/Code Analysis
         print("\n📊 Step 3/4: Context & Business Analysis")
         print("-" * 70)
-        business_case = await analyze_business(str(project_path), project['title'])
+        # Inject the enriched context into business analysis
+        business_case = await analyze_business(str(project_path), project['title'], extra_context=enriched_context)
 
         # Add paths information for merged projects (for manual inputs search)
         if project.get('paths'):

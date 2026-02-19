@@ -189,6 +189,33 @@ class ContextEnricher:
             # Fallback to mock research
             return self._generate_mock_research(query)
 
+    async def perform_strategic_research(self, api_key: str = None) -> str:
+        """Conduct deep strategic research (Market, Tech, Objectives)."""
+        project_name = self.project_path.name
+        summary_query = f"Provide a concise summary and core business objective for a project named '{project_name}'. Identify its main purpose."
+        market_query = f"Research the current market landscape, main competitors, and industry gaps for a project like '{project_name}'."
+        tech_query = f"Analyze existing and emerging technologies, frameworks, and tools relevant to developing '{project_name}' in 2026."
+
+        print(f"\n🌐 Iniciando Pesquisa Estratégica para: {project_name}")
+        
+        results = []
+        
+        # 1. Summary
+        summary = await self.enrich_with_web_research(summary_query, api_key)
+        results.append(f"### 🎯 OBJETIVO & SUMÁRIO\n{summary}")
+        
+        # 2. Market
+        market = await self.enrich_with_web_research(market_query, api_key)
+        results.append(f"### 📈 MERCADO & CONCORRÊNCIA\n{market}")
+        
+        # 3. Tech
+        tech = await self.enrich_with_web_research(tech_query, api_key)
+        results.append(f"### 🛠️ TECNOLOGIA & TENDÊNCIAS\n{tech}")
+        
+        full_research = "\n\n".join(results)
+        self.enriched_context['web_research'] = full_research
+        return full_research
+
     def _generate_research_query(self) -> str:
         """Generate intelligent research query by analyzing actual project content."""
         keywords = set()

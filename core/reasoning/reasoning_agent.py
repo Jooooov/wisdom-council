@@ -9,9 +9,9 @@ Qwen3Loader  - Auto-selects best Qwen3 model based on available RAM.
 
 ReasoningAgent - Drives long chain-of-thought reasoning for each themed agent:
     - Lyra (Exploradora)   : generates 4 creative branches
-    - Will (Executor)      : validates practical feasibility
-    - Mrs. Coulter (Crítica): adversarial risk analysis
-    - Iorek (Analista)     : financial modeling
+    - Coram (Validador)    : validates practical feasibility
+    - Marisa (Crítica)     : adversarial risk analysis
+    - Iorek (Arquitecto)   : financial modeling
     - Meta-Daemon          : synthesizes all agents → final decision
 
 Qwen3 CoT format:
@@ -160,35 +160,50 @@ class Qwen3Loader:
 # Prompt templates (one per agent persona)
 # ---------------------------------------------------------------------------
 
-_LYRA_SYSTEM = """You are Lyra, a creative explorer and analyst.
-Your daemon Pantalaimon (a shape-shifting marten) helps you think from many angles.
-Task: generate exactly 4 diverse, creative reasoning branches for the given business idea.
-Each branch must represent a genuinely different approach or assumption set.
-Be explicit about your assumptions. Rate confidence honestly (0.0–1.0).
-Respond with valid JSON only (no markdown fences)."""
+_LYRA_SYSTEM = """Tu és Lyra, uma exploradora criativa e analista.
+O teu daemon Pantalaimon (um arminho) ajuda-te a pensar sob vários ângulos.
+PERSONALIDADE DO DAEMON: Pan é cauteloso onde Lyra é impulsiva. Ele vê o perigo antes.
+TAREFA: gera exatamente 4 ramificações de raciocínio diversas para a ideia.
 
-_WILL_SYSTEM = """You are Will, a pragmatic executor focused on real-world feasibility.
-Task: evaluate whether a proposed approach is achievable with the given team and resources.
-Think step by step. Check assumptions. Identify concrete blockers.
-Give a feasibility_score between 0.0 (impossible) and 1.0 (trivially easy).
-Respond with valid JSON only (no markdown fences)."""
+DEBATE INTERNO COM DAEMON:
+Antes da tua resposta final, mostra um breve pensamento de Pan a desafiar o teu entusiasmo.
 
-_COULTER_SYSTEM = """You are Mrs. Coulter, a sharp-minded critic and risk analyst.
-Your Golden Monkey daemon helps you see what others miss or wish to hide.
-Task: find hidden risks, challenge assumptions, play devil's advocate ruthlessly.
-Give a risk_score between 0.0 (catastrophic risk) and 1.0 (very low risk).
-Respond with valid JSON only (no markdown fences)."""
+Responde apenas com JSON válido."""
 
-_IOREK_SYSTEM = """You are Iorek Byrnison, a methodical financial analyst.
-Like an armored bear, you are solid, precise, and impossible to deceive.
-Task: calculate development costs, revenue projections, ROI, and scenario models.
-Give a financial_score between 0.0 (terrible economics) and 1.0 (excellent ROI).
-Respond with valid JSON only (no markdown fences)."""
+_CORAM_SYSTEM = """Tu és Farder Coram, um validador experiente e pragmático.
+O teu daemon Sophonax (um gato) é uma observadora paciente e sábia.
+PERSONALIDADE DO DAEMON: Sophonax detecta inconsistências que a tua experiência normaliza.
+TAREFA: avalia se a abordagem é alcançável com os recursos dados.
 
-_META_SYSTEM = """You are the Meta-Daemon, an orchestrator who synthesizes all agent analyses.
-Task: weigh every perspective and produce a final GO / NO_GO / NEEDS_MORE_INFO decision.
-Justify your decision clearly. Assign a confidence score (0.0–1.0).
-Respond with valid JSON only (no markdown fences)."""
+DEBATE INTERNO COM DAEMON:
+Mostra Sophonax a questionar a tua confiança baseada apenas no passado.
+
+Responde apenas com JSON válido."""
+
+_MARISA_SYSTEM = """Tu és Marisa Coulter, uma crítica implacável e analista de risco.
+O teu daemon Macaco Dourado ajuda-te a ver o que outros escondem.
+PERSONALIDADE DO DAEMON: O Macaco Dourado é brutalmente honesto sobre o custo das ambições.
+TAREFA: encontra riscos ocultos, desafia pressupostos, sê o advogado do diabo.
+
+DEBATE INTERNO COM DAEMON:
+O Macaco Dourado deve expor a fragilidade escondida na tua análise.
+
+Responde apenas com JSON válido."""
+
+_IOREK_SYSTEM = """Tu és Iorek Byrnison, um arquitecto e modelador financeiro.
+A tua armadura é a tua alma exteriorizada — forjada, não nascida. Ela não mente nem tolera fragilidade.
+TAREFA: calcula custos, projecções de receita, ROI e modelos de cenário.
+
+DEBATE INTERNO COM DAEMON (A tua Armadura):
+A armadura exige integridade estrutural absoluta e rejeita qualquer embelezamento.
+
+Responde apenas com JSON válido."""
+
+_META_SYSTEM = """Tu és o Meta-Daemon, um orquestrador que sintetiza as análises de todos os agentes.
+Representas a sabedoria colectiva da Poeira (Dust).
+TAREFA: pesa todas as perspectivas e produz uma decisão final: GO / NO_GO / NEEDS_MORE_INFO.
+
+Responde apenas com JSON válido."""
 
 
 def _build_prompt(system_msg: str, user_content: str) -> str:
@@ -303,39 +318,29 @@ Current tree depth: {depth}{past_section}
 Generate exactly 4 diverse reasoning branches. Each must represent a DIFFERENT approach.
 
 Return this JSON structure:
-{{
   "branches": [
     {{"label": "Branch A", "description": "...", "key_assumption": "...", "confidence": 0.0}},
     {{"label": "Branch B", "description": "...", "key_assumption": "...", "confidence": 0.0}},
     {{"label": "Branch C", "description": "...", "key_assumption": "...", "confidence": 0.0}},
     {{"label": "Branch D", "description": "...", "key_assumption": "...", "confidence": 0.0}}
   ],
+  "daemon_debate": "O debate entre Lyra e Pan sobre estas ramificações",
+  "research_questions": ["pergunta 1", "pergunta 2"],
   "reasoning_summary": "Brief explanation of why these 4 branches cover the solution space"
 }}"""
         return await self._call(_LYRA_SYSTEM, user_content, self.LYRA_TOKENS)
 
-    async def will_validate(
+    async def coram_validate(
         self, branch_description: str, business_idea: str
     ) -> Optional[Dict]:
         """
-        Will validates practical feasibility.
-
-        Returns:
-            {
-              "verdict": "FEASIBLE" | "PARTIALLY_FEASIBLE" | "NOT_FEASIBLE",
-              "feasibility_score": 0.0,
-              "blockers": [...],
-              "requirements": [...],
-              "timeline_estimate": "...",
-              "reasoning": "..."
-            }
+        Coram validates practical feasibility.
         """
         user_content = f"""Business idea: {business_idea}
-
 Proposed approach: {branch_description}
 
-Assess practical feasibility. Consider: required team size, technical complexity,
-timeline realism, external dependencies, and resource availability.
+Avalia a viabilidade prática. Considera: equipa, complexidade técnica,
+prazos realistas e recursos.
 
 Return this JSON:
 {{
@@ -344,31 +349,24 @@ Return this JSON:
   "blockers": ["list any hard blockers here"],
   "requirements": ["what is needed to execute this"],
   "timeline_estimate": "e.g. 8 weeks for MVP",
+  "daemon_debate": "O debate entre Coram e Sophonax",
+  "research_questions": ["que dados faltam para validar a viabilidade?"],
   "reasoning": "step-by-step feasibility reasoning"
 }}"""
-        return await self._call(_WILL_SYSTEM, user_content, self.WILL_TOKENS)
+        return await self._call(_CORAM_SYSTEM, user_content, self.WILL_TOKENS)
 
-    async def coulter_assess_risks(
-        self, branch_description: str, will_output: Dict
+    async def marisa_assess_risks(
+        self, branch_description: str, coram_output: Dict
     ) -> Optional[Dict]:
         """
-        Mrs. Coulter performs adversarial risk analysis.
-
-        Returns:
-            {
-              "risk_score": 0.0,   (1.0 = very safe, 0.0 = catastrophic)
-              "risks": [{"risk": "...", "likelihood": 0.0, "impact": "HIGH|MED|LOW", "mitigation": "..."}],
-              "challenged_assumptions": [...],
-              "counter_arguments": [...],
-              "overall_assessment": "..."
-            }
+        Marisa performs adversarial risk analysis.
         """
         user_content = f"""Proposed approach: {branch_description}
 
-Will's feasibility assessment:
-{json.dumps(will_output, indent=2)}
+Coram's feasibility assessment:
+{json.dumps(coram_output, indent=2)}
 
-Challenge this approach ruthlessly. Find hidden risks, weak assumptions, and failure modes.
+Desafia esta abordagem sem piedade. Encontra riscos ocultos e falhas de pressupostos.
 
 Return this JSON:
 {{
@@ -377,10 +375,11 @@ Return this JSON:
     {{"risk": "description", "likelihood": 0.0, "impact": "HIGH", "mitigation": "how to address it"}}
   ],
   "challenged_assumptions": ["assumptions that may be wrong"],
-  "counter_arguments": ["devil's advocate arguments against this approach"],
+  "daemon_debate": "O debate entre Marisa e o Macaco Dourado",
+  "research_questions": ["que riscos precisam de mais pesquisa?"],
   "overall_assessment": "one-sentence summary of risk level"
 }}"""
-        return await self._call(_COULTER_SYSTEM, user_content, self.COULTER_TOKENS)
+        return await self._call(_MARISA_SYSTEM, user_content, self.COULTER_TOKENS)
 
     async def iorek_model_financials(
         self,
@@ -419,6 +418,8 @@ Return this JSON:
     "mid_case":   {{"roi": 0.0, "timeline": "..."}},
     "worst_case": {{"roi": 0.0, "timeline": "..."}}
   }},
+  "daemon_debate": "O debate entre Iorek e a sua Armadura",
+  "research_questions": ["que custos ou métricas de mercado faltam?"],
   "confidence": 0.0,
   "key_assumptions": ["list major financial assumptions"]
 }}"""
@@ -456,6 +457,7 @@ Return this JSON:
   "confidence": 0.0,
   "best_branch": "branch label here",
   "rationale": "why this decision was reached",
+  "research_questions": ["que dúvidas finais os humanos devem resolver?"],
   "key_success_factors": ["factor 1", "factor 2"],
   "recommended_next_steps": ["step 1", "step 2", "step 3"]
 }}"""

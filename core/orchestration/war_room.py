@@ -18,6 +18,22 @@ from core.research.manual_inputs import get_context_for_agent
 from core.research.context_enricher import ContextEnricher
 from core.memory.hybrid_memory import create_hybrid_memory
 
+# Strategic order for agent analysis — mirrors a real consulting pipeline
+# Each agent builds on the previous one's insights:
+#   1. Research first (context)  →  2. Analyse data  →  3. Design structure
+#   4. Evaluate execution  →  5. Validate assumptions  →  6. Communicate
+#   7. Strategic alignment  →  8. Tool recommendations
+AGENT_ANALYSIS_ORDER = [
+    "researcher",    # Serafina — gather context and research first
+    "analyst",       # Lyra — analyse the data gathered
+    "architect",     # Iorek — design structure based on analysis
+    "developer",     # Marisa — evaluate execution feasibility
+    "validator",     # Coram — validate and test assumptions
+    "writer",        # Lee — synthesise and communicate findings
+    "coordinator",   # Asriel — strategic alignment and direction
+    "tools_manager", # Mary — tool recommendations and holistic view
+]
+
 
 class WarRoom:
     """Real-time agent collaboration with LLM reasoning."""
@@ -110,15 +126,37 @@ class WarRoom:
         print(f"Índice de Viabilidade: {self.business_case.get('viability_score', 0)}/100")
 
         try:
-            # Phase 1: Individual Agent Analysis
+            # Phase 1: Individual Agent Analysis + Daemon Debate
             print("\n" + "-" * 70)
-            print("📍 FASE 1: Análise Individual dos Agentes (com Raciocínio LLM)")
+            print("📍 FASE 1: Análise Individual + Debate com Daemon")
+            print("    (Cada agente consulta o seu daemon antes de emitir parecer)")
             print("-" * 70)
 
-            for agent in self.agents:
-                print(f"\n🧙 {agent.name} ({agent.role}) está analisando...")
+            # Get agents in strategic pipeline order
+            ordered_agents = self._get_ordered_agents()
+
+            for i, agent in enumerate(ordered_agents, 1):
+                print(f"\n🧙 [{i}/{len(ordered_agents)}] {agent.name} ({agent.role}) está analisando...")
                 perspective = await self._get_agent_reasoning(agent)
                 self.agent_perspectives[agent.name] = perspective
+                
+                # Check for research questions and pause if needed
+                questions = perspective.get('research_questions', [])
+                if questions:
+                    print(f"\n❓ {agent.name} tem dúvidas que precisam de pesquisa:")
+                    for q in questions:
+                        print(f"   - {q}")
+                    
+                    user_help = input(f"\n🤔 Queres ajudar a pesquisar estas questões no Perplexity agora? (s/n): ").lower()
+                    if user_help == 's':
+                        research_data = input(f"📝 Introduz aqui os resultados da tua pesquisa (ou 'pular'): ")
+                        if research_data.lower() != 'pular':
+                            # Update business case with new context for future agents
+                            if 'extra_context' not in self.business_case or not self.business_case['extra_context']:
+                                self.business_case['extra_context'] = ""
+                            
+                            self.business_case['extra_context'] += f"\n\n🔍 INFO ADICIONAL (Pesquisada pelo utilizador para {agent.name}):\n{research_data}"
+                            print(f"✅ Informação adicionada ao contexto da Sala de Guerra.")
 
             # Phase 2: Open Discussion
             print("\n" + "-" * 70)
@@ -171,7 +209,13 @@ class WarRoom:
             return {"status": "FAILED", "error": str(e)}
 
     async def _get_agent_reasoning(self, agent) -> Dict[str, Any]:
-        """Get LLM-based reasoning from specific agent with their personality."""
+        """Get LLM-based reasoning from specific agent with daemon debate.
+
+        Flow:
+        1. Agent produces initial reasoning
+        2. Daemon critiques and challenges (complementary perspective)
+        3. Agent consolidates both views into final opinion
+        """
         # Build context for the agent
         business_summary = self._build_business_summary_for_agent(agent)
 
@@ -212,29 +256,68 @@ class WarRoom:
 
         # Get LLM reasoning
         try:
-            # Use very high max_tokens for complete untruncated reasoning
-            reasoning = await self.llm_loader.generate(
+            # Step 1: Agent's initial reasoning
+            print(f"      💭 {agent.name} está a formular a sua análise inicial...")
+            initial_reasoning = await self.llm_loader.generate(
                 prompt=prompt,
                 max_tokens=3000  # Full reasoning without truncation
             )
+
+            # Step 2: Daemon critique (the soul challenges the human)
+            daemon_critique = await self._get_daemon_critique(
+                agent, initial_reasoning, business_summary
+            )
+
+            # Step 3: Agent consolidation (incorporating daemon's feedback)
+            if daemon_critique and daemon_critique != "Crítica indisponível":
+                consolidation_prompt = f"""Tu és {agent.name} ({agent.role}).
+O teu daemon acabou de te desafiar com esta crítica:
+
+{daemon_critique}
+
+A tua análise inicial era:
+{initial_reasoning[:600]}
+
+Agora, CONSOLIDA a tua opinião final em 3-5 linhas, incorporando os pontos válidos do teu daemon.
+Mantém a tua essência mas reconhece os pontos cegos que o daemon identificou.
+Responde em português."""
+
+                print(f"      🔄 {agent.name} está a consolidar a opinião final...")
+                consolidated = await self.llm_loader.generate(
+                    prompt=consolidation_prompt,
+                    max_tokens=500
+                )
+            else:
+                consolidated = initial_reasoning
+
+            # Build the complete reasoning chain
+            full_reasoning = f"{initial_reasoning}\n\n--- DAEMON DEBATE ---\n{daemon_critique}\n\n--- OPINIÃO CONSOLIDADA ---\n{consolidated}"
+
+            # Extract research questions
+            questions = self._extract_research_questions(consolidated)
 
             perspective = {
                 "agent": agent.name,
                 "role": agent.role,
                 "daemon": getattr(agent, 'daemon', 'Unknown'),
-                "reasoning": reasoning,
-                "key_points": self._extract_key_points(reasoning),
-                "recommendation": self._extract_recommendation(reasoning),
-                "confidence": self._extract_confidence(reasoning)
+                "reasoning": consolidated, # Use consolidated for main reasoning
+                "initial_reasoning": initial_reasoning,
+                "daemon_critique": daemon_critique,
+                "consolidated_opinion": consolidated,
+                "key_points": self._extract_key_points(consolidated),
+                "recommendation": self._extract_recommendation(consolidated),
+                "confidence": self._extract_confidence(consolidated),
+                "research_questions": questions
             }
 
-            # Print detailed agent thinking
+            # Print detailed agent thinking + daemon debate
             self._display_agent_thinking(agent, perspective)
+            self._display_daemon_debate(agent, perspective)
 
             self.discussion_log.append({
                 "speaker": agent.name,
-                "phase": "individual_analysis",
-                "content": reasoning
+                "phase": "individual_analysis_with_daemon",
+                "content": full_reasoning
             })
 
             return perspective
@@ -247,6 +330,61 @@ class WarRoom:
                 "reasoning": "Análise indisponível",
                 "error": str(e)
             }
+
+    async def _get_daemon_critique(self, agent, agent_reasoning: str, business_context: str) -> str:
+        """Get the daemon's critical counter-perspective to the agent's reasoning.
+
+        The daemon acts as the agent's internal conscience — a complementary
+        voice that challenges assumptions and refines the analysis.
+        """
+        daemon_name = agent.daemon.split('(')[0].strip() if '(' in agent.daemon else agent.daemon
+        print(f"      🐾 {daemon_name} está a desafiar {agent.name}...")
+
+        try:
+            # Use the Agent's built-in daemon debate prompt generator
+            daemon_prompt = agent.get_daemon_debate_prompt(agent_reasoning, business_context)
+
+            critique = await self.llm_loader.generate(
+                prompt=daemon_prompt,
+                max_tokens=400  # Daemon should be concise and sharp
+            )
+
+            return critique
+
+        except Exception as e:
+            print(f"      ⚠️  Daemon não respondeu: {e}")
+            return "Crítica indisponível"
+
+    def _display_daemon_debate(self, agent, perspective: Dict[str, Any]):
+        """Display the daemon's critique and the agent's consolidated response."""
+        daemon_name = agent.daemon.split('(')[0].strip() if '(' in agent.daemon else agent.daemon
+        critique = perspective.get('daemon_critique', '')
+        consolidated = perspective.get('consolidated_opinion', '')
+
+        if not critique or critique == "Crítica indisponível":
+            return
+
+        # Daemon critique box
+        print(f"\n   {'╭' + '─' * 66 + '╮'}")
+        print(f"   │ 🐾 DAEMON: {daemon_name.upper():<53}│")
+        print(f"   │    Desafia {agent.name} com perspectiva complementar{' ' * (10 - len(agent.name))}│")
+        print(f"   {'├' + '─' * 66 + '┤'}")
+
+        critique_lines = critique.split('\n')
+        for line in critique_lines[:5]:
+            wrapped = line[:62] if len(line) > 62 else line
+            print(f"   │    {wrapped:<62}│")
+
+        print(f"   {'├' + '─' * 66 + '┤'}")
+        print(f"   │ 🔄 OPINIÃO CONSOLIDADA DE {agent.name.upper():<38}│")
+        print(f"   {'├' + '─' * 66 + '┤'}")
+
+        consolidated_lines = consolidated.split('\n')
+        for line in consolidated_lines[:4]:
+            wrapped = line[:62] if len(line) > 62 else line
+            print(f"   │    {wrapped:<62}│")
+
+        print(f"   {'╰' + '─' * 66 + '╯'}")
 
     async def _facilitate_discussion(self) -> str:
         """Facilitate discussion between agents based on their perspectives."""
@@ -343,6 +481,30 @@ class WarRoom:
                 "error": str(e)
             }
 
+    def _get_ordered_agents(self) -> List[Any]:
+        """Sort agents according to the strategic AGENT_ANALYSIS_ORDER."""
+        ordered = []
+        
+        # Create a map for quick lookup
+        agent_map = {}
+        for agent in self.agents:
+            role_key = agent.id.lower() if hasattr(agent, "id") else agent.role.lower()
+            if role_key not in agent_map:
+                agent_map[role_key] = []
+            agent_map[role_key].append(agent)
+            
+        # Build list based on order
+        for role_id in AGENT_ANALYSIS_ORDER:
+            if role_id in agent_map:
+                ordered.extend(agent_map[role_id])
+                
+        # Add any agents not in the ordered list (safety first)
+        for agent in self.agents:
+            if agent not in ordered:
+                ordered.append(agent)
+                
+        return ordered
+
     # ========== Helper Methods ==========
 
     def _build_business_summary_for_agent(self, agent) -> str:
@@ -361,6 +523,10 @@ DESCOBERTAS-CHAVE:
 Vantagens: {', '.join(case.get('competitive_analysis', {}).get('competitive_advantages', [])[:2])}
 Ameaças: {', '.join(case.get('competitive_analysis', {}).get('threats', [])[:2])}
 """
+        # Add strategic research if available
+        if case.get('extra_context'):
+            summary += f"\n🌐 PESQUISA ESTRATÉGICA (Perplexity):\n{case['extra_context']}\n"
+
         return summary.strip()
 
     def _create_agent_prompt(self, agent, business_summary: str, past_experiences: str = "") -> str:
@@ -427,26 +593,47 @@ Caso de negócio:
 
 Pensamento: Isto está alinhado com nossa visão? Vale nosso tempo e recursos?""",
         }
-
         # Match role to prompt
+        instruction = "\nSe sentires falta de informação crucial, inclui uma secção final chamada [QUESTOES_DE_PESQUISA] com uma lista de perguntas para o utilizador ajudar a investigar no Perplexity."
         for key, prompt in role_prompts.items():
             if key in agent.role.lower() or key in agent.name.lower():
-                return prompt
+                return f"{prompt}\n{instruction}"
 
         # Default
-        return f"{manual_context}Analise este caso de negócio: {business_summary}\n\nQual é sua opinião profissional? Responda em português."
+        return f"{manual_context}Analise este caso de negócio: {business_summary}\n\nQual é sua opinião profissional? {instruction} Responda em português."
+
+    def _extract_research_questions(self, text: str) -> List[str]:
+        """Extract research questions from agent output [QUESTOES_DE_PESQUISA]."""
+        import re
+        pattern = r"\[QUESTOES_DE_PESQUISA\](.*)"
+        match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        
+        if not match:
+            return []
+            
+        questions_text = match.group(1).strip()
+        lines = questions_text.split('\n')
+        questions = []
+        for line in lines:
+            line = line.strip().lstrip('-').lstrip('*').lstrip('123456789.').strip()
+            if line and len(line) > 5:
+                questions.append(line)
+        return questions
 
     def _build_discussion_prompt(self) -> str:
-        """Build prompt for agents to discuss together."""
+        """Build prompt for agents to discuss together.
+
+        Now includes consolidated opinions (post-daemon-debate) for richer discussion.
+        """
         perspectives_summary = "\n".join([
-            f"- {name}: {p.get('recommendation', 'Indisponível')}"
+            f"- {name} (pós-debate com daemon): {p.get('consolidated_opinion', p.get('recommendation', 'Indisponível'))[:120]}"
             for name, p in self.agent_perspectives.items()
         ])
 
         return f"""Os agentes estão agora tendo uma discussão aberta sobre o caso de negócio:
 {self.business_case.get('project_name')}
 
-Posições atuais:
+Posições consolidadas (após debate interno com daemons):
 {perspectives_summary}
 
 Tenha uma discussão realista e profissional entre os agentes. Inclua:

@@ -28,13 +28,16 @@ class BusinessAnalyzer:
             "project_name": project_name,
             "status": "ANALYZING",
             "context": None,
+            "extra_context": None,
             "market_research": None,
             "competitive_analysis": None,
             "ready_for_agent_discussion": False
         }
 
-    async def run_full_analysis(self) -> Dict[str, Any]:
+    async def run_full_analysis(self, extra_context: str = None) -> Dict[str, Any]:
         """Run complete business analysis."""
+        if extra_context:
+            self.business_case["extra_context"] = extra_context
         print("\n" + "=" * 70)
         print("🏢 BUSINESS ANALYSIS: Comprehensive Market & Competitive Review")
         print("=" * 70)
@@ -143,7 +146,7 @@ class BusinessAnalyzer:
         return questions
 
 
-async def analyze_business(project_path: str, project_name: str) -> Dict[str, Any]:
+async def analyze_business(project_path: str, project_name: str, extra_context: str = None) -> Dict[str, Any]:
     """Factory function for business analysis."""
     analyzer = BusinessAnalyzer(project_path, project_name)
-    return await analyzer.run_full_analysis()
+    return await analyzer.run_full_analysis(extra_context=extra_context)
