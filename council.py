@@ -513,18 +513,30 @@ def _optimise_project_context(project):
                 return None
             prompt = (
                 "<|im_start|>system\n"
-                "You are a context compressor. Rewrite the input as dense, "
-                "token-efficient bullet points. Preserve every fact, number, name "
-                "and decision. Remove all prose, greetings, and repetition. "
-                "Output plain text bullets only, no JSON, no markdown headers."
+                "You are an aggressive context compressor for LLM prompts. "
+                "Rules: (1) Convert to terse bullet points. "
+                "(2) Use standard abbreviations: co=company, rev=revenue, emp=employee(s), "
+                "mgmt=management, ops=operations, ~=approximately, PT=Portugal, BR=Brazil, "
+                "yr=year, mo=month, k=thousand, w/=with, w/o=without, vs=versus. "
+                "(3) Drop articles (the/a/an), filler words, and obvious context. "
+                "(4) Merge related facts into one bullet. "
+                "(5) Numbers stay exact. Names stay exact. "
+                "Output ONLY the bullet list — no headers, no prose, no JSON."
                 "<|im_end|>\n"
                 f"<|im_start|>user\n{manual_text}\n\n"
-                "Compress this to the shortest form that retains all information. /no_think"
+                "Compress. /no_think"
                 "<|im_end|>\n"
-                "<|im_start|>assistant\n"
+                "<|im_start|>assistant\n- "
             )
-            raw = await system.llm_loader.generate(prompt, max_tokens=600)
-            return raw.strip()
+            import re as _re
+            raw = await system.llm_loader.generate(prompt, max_tokens=400)
+            # Strip any <think>...</think> blocks (complete or truncated)
+            raw = _re.sub(r"<think>.*?</think>", "", raw, flags=_re.DOTALL)
+            raw = _re.sub(r"<think>.*$", "", raw, flags=_re.DOTALL).strip()
+            # Restore the leading bullet we injected to guide the model
+            if raw and not raw.startswith("-"):
+                raw = "- " + raw
+            return raw
 
         compressed = asyncio.run(_compress())
         if compressed:
