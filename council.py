@@ -461,29 +461,43 @@ def _project_actions(council, project):
 
 def _optimise_project_context(project):
     """Use the LLM to compress Manual Inputs into dense, token-efficient bullet points."""
-    # Resolve manual input text and its source file
+    # Always read from disk — never rely on the cached/truncated dict value
     obs = project.get("obsidian_project") or project
-    manual_text = obs.get("manual_input", "")
-    if not manual_text:
-        _info("No Manual Inputs found for this project.")
-        _pause()
-        return
-
     obs_path = Path(obs.get("path", ""))
+
     manual_file = None
+    all_files = []
     for dir_name in ["Manual Inputs", "manual_inputs", "manual inputs"]:
         candidate = obs_path / dir_name
         if candidate.is_dir():
-            files = sorted(candidate.glob("*.md"))
-            if files:
-                manual_file = files[0]
+            all_files = sorted(candidate.glob("*.md"))
+            if all_files:
+                manual_file = all_files[0]   # primary file to overwrite
             break
+
+    if not all_files:
+        _info("No Manual Inputs folder found for this project.")
+        _pause()
+        return
+
+    # Read every .md file in the folder — full content, no truncation
+    parts = []
+    for f in all_files:
+        content = f.read_text(encoding="utf-8").strip()
+        if content:
+            parts.append(f"# {f.name}\n{content}" if len(all_files) > 1 else content)
+    manual_text = "\n\n".join(parts)
+
+    if not manual_text:
+        _info("Manual Inputs folder is empty.")
+        _pause()
+        return
 
     clr()
     print(f"\n{GOLD}{BOLD}  ✂️  OPTIMISE CONTEXT — {project['title'].upper()}{RESET}")
     _line()
-    print(f"\n  {GREY}Current Manual Inputs ({len(manual_text)} chars):{RESET}")
-    print(f"  {GREY}{manual_text[:300]}...{RESET}\n")
+    print(f"\n  {GREY}Reading from disk: {len(all_files)} file(s), {len(manual_text)} chars total{RESET}")
+    print(f"  {GREY}{manual_text[:300]}{'...' if len(manual_text) > 300 else ''}{RESET}\n")
     print(f"  The LLM will rewrite this as concise bullet points,")
     print(f"  preserving every key fact but eliminating prose.")
     print(f"  Original file kept as .bak before overwriting.\n")
@@ -1379,8 +1393,16 @@ def run_optimise_context():
         return
 
     for i, p in enumerate(candidates, 1):
-        manual = p.get("manual_input") or p.get("obsidian_project", {}).get("manual_input", "")
-        print(f"  [{i}]  {CYAN}{p['title']}{RESET}  {GREY}({len(manual)} chars){RESET}")
+        # Read actual file size from disk, not the (possibly truncated) dict value
+        obs = p.get("obsidian_project") or p
+        obs_path = Path(obs.get("path", ""))
+        disk_size = 0
+        for dir_name in ["Manual Inputs", "manual_inputs", "manual inputs"]:
+            d = obs_path / dir_name
+            if d.is_dir():
+                disk_size = sum(f.stat().st_size for f in d.glob("*.md"))
+                break
+        print(f"  [{i}]  {CYAN}{p['title']}{RESET}  {GREY}({disk_size} chars on disk){RESET}")
     print(f"  [0]  {GREY}↩ Back{RESET}")
     _line()
 
