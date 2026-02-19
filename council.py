@@ -535,15 +535,14 @@ def _optimise_project_context(project):
             # Strip any <think>...</think> blocks (complete or truncated)
             raw = _re.sub(r"<think>.*?</think>", "", raw, flags=_re.DOTALL)
             raw = _re.sub(r"<think>.*$", "", raw, flags=_re.DOTALL).strip()
-            # Post-process: remove spaces around special chars
-            raw = _re.sub(r"~\s+", "~", raw)               # ~ 200  → ~200
-            raw = _re.sub(r"\s*/\s*", "/", raw)             # w/ ops → w/ops  (also x / y → x/y)
+            # Post-process: squeeze spaces around/after special chars
+            raw = _re.sub(r"\s*~\s*", "~", raw)             # x ~200 / ~ 200 → ~200
+            raw = _re.sub(r"\s*/\s*", "/", raw)             # w/ ops → w/ops
             raw = _re.sub(r"\s*\+\s*", "+", raw)            # 1 + 1  → 1+1
             raw = _re.sub(r"\s*→\s*", "→", raw)             # A → B  → A→B
             raw = _re.sub(r"\s*·\s*", "·", raw)             # a · b  → a·b
-            # Restore the leading bullet we injected to guide the model
-            if raw and not raw.startswith("-"):
-                raw = "- " + raw
+            raw = _re.sub(r":\s+", ":", raw)                 # key: val → key:val
+            raw = _re.sub(r"^-\s+", "-", raw, flags=_re.MULTILINE)  # - item → -item
             return raw
 
         compressed = asyncio.run(_compress())
