@@ -192,11 +192,16 @@ Respond with valid JSON only (no markdown fences)."""
 
 
 def _build_prompt(system_msg: str, user_content: str) -> str:
-    """Build a Qwen3 chat-format prompt with CoT instruction."""
+    """Build a Qwen3 chat-format prompt.
+
+    /no_think disables Qwen3's <think> CoT block — the model reasons internally
+    but skips emitting the verbose <think>...</think> output.  This prevents
+    the block from consuming all max_tokens before the JSON answer is produced.
+    """
     return (
         f"<|im_start|>system\n{system_msg}<|im_end|>\n"
         f"<|im_start|>user\n{user_content}\n\n"
-        f"Think carefully step by step before writing your JSON answer.\n"
+        f"Reply with valid JSON only. /no_think\n"
         f"<|im_end|>\n"
         f"<|im_start|>assistant\n"
     )
@@ -205,10 +210,12 @@ def _build_prompt(system_msg: str, user_content: str) -> str:
 def _extract_json(raw: str) -> Optional[Dict]:
     """
     Extract the first valid JSON object from raw LLM output.
-    Strips Qwen3's <think>...</think> chain-of-thought blocks first.
+    Strips Qwen3's <think>...</think> blocks first (complete or truncated).
     """
-    # Remove Qwen3 reasoning blocks
+    # Remove complete Qwen3 reasoning blocks
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
+    # Remove truncated/incomplete think blocks (no closing tag — hit max_tokens)
+    raw = re.sub(r"<think>.*$", "", raw, flags=re.DOTALL)
     # Strip markdown fences if model added them
     raw = re.sub(r"```(?:json)?", "", raw)
 
