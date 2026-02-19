@@ -62,24 +62,14 @@ class Agent:
         """
         daemon_name = self.daemon.split('(')[0].strip() if '(' in self.daemon else self.daemon
 
-        return f"""Tu és {daemon_name}, o daemon de {self.name}.
-{self.daemon_personality}
+        return f"""Tu és {daemon_name}, daemon de {self.name}. {self.daemon_personality}
+Desafia o raciocínio de {self.name}. Estilo: {self.daemon_critique_style}
 
-O teu papel é DESAFIAR e REFINAR o raciocínio de {self.name} antes que apresente ao conselho.
-Estilo de crítica: {self.daemon_critique_style}
+CONTEXTO: {business_context[:300]}
+RACIOCÍNIO: {agent_reasoning[:400]}
 
-CONTEXTO DO NEGÓCIO:
-{business_context[:500]}
-
-RAZOAMENTO INICIAL DE {self.name.upper()}:
-{agent_reasoning[:800]}
-
-Como {daemon_name}, responde em 3-5 linhas:
-1. O que {self.name} está a ignorar ou subestimar?
-2. Que contra-argumento deveria considerar?
-3. Qual é o teu conselho final como daemon?
-
-Responde em português, de forma directa e incisiva."""
+Responde em 3 linhas: O que é ignorado? Contra-argumento? Conselho final?
+Sê directo, incisivo, sem 'Okay'. Responde em português. /no_filler"""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert agent to dictionary."""

@@ -593,14 +593,9 @@ Caso de negócio:
 
 Pensamento: Isto está alinhado com nossa visão? Vale nosso tempo e recursos?""",
         }
-        # Match role to prompt
-        instruction = "\nSe sentires falta de informação crucial, inclui uma secção final chamada [QUESTOES_DE_PESQUISA] com uma lista de perguntas para o utilizador ajudar a investigar no Perplexity."
-        for key, prompt in role_prompts.items():
-            if key in agent.role.lower() or key in agent.name.lower():
-                return f"{prompt}\n{instruction}"
-
         # Default
-        return f"{manual_context}Analise este caso de negócio: {business_summary}\n\nQual é sua opinião profissional? {instruction} Responda em português."
+        instruction = "\nResponde DIRECTAMENTE (sem 'Okay' ou introduções) com uma secção final [QUESTOES_DE_PESQUISA] se necessário. Sê incisivo. /no_filler"
+        return f"{manual_context}Analise este caso: {business_summary}\n\nOpinião profissional? {instruction}"
 
     def _extract_research_questions(self, text: str) -> List[str]:
         """Extract research questions from agent output [QUESTOES_DE_PESQUISA]."""
@@ -674,10 +669,12 @@ Devemos proceder (SIM) ou pivotar/cancelar (NÃO)?
 Forneça raciocínio claro para sua recomendação. Responda em português."""
 
     def _extract_key_points(self, text: str) -> List[str]:
-        """Extract key points from reasoning text."""
-        lines = text.split('\n')
-        points = [l.strip() for l in lines if l.strip() and len(l.strip()) > 20]
-        return points[:3]
+        """Extract key points from reasoning text, avoiding the first lines."""
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        # Skip first 2 lines to avoid repeating the "intro" which user complained about
+        meaningful_lines = [l for l in lines[2:] if len(l) > 30]
+        if not meaningful_lines: meaningful_lines = lines # fallback
+        return meaningful_lines[:3]
 
     def _extract_recommendation(self, text: str) -> str:
         """Extract GO/NO-GO recommendation from reasoning."""
@@ -728,7 +725,6 @@ Forneça raciocínio claro para sua recomendação. Responda em português."""
                 print(f"   │    • {wrapped_point:<60}│")
 
         # Show recommendation and confidence
-        print(f"   │                                                        │")
         confidence_bar = "█" * (confidence // 2) + "░" * (5 - confidence // 2)
         print(f"   │ ✓ RECOMENDAÇÃO: {recommendation:<45}│")
         print(f"   │   Confiança: {confidence_bar} ({confidence}/10)            │")
